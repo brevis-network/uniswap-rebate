@@ -30,21 +30,24 @@ contract ZkRebate {
     }
 
     // to be called by msg.sender for Swap (router contract in most cases)
-    // 1. relay calldata to BrevisRequest.fulfillrequests
+    // 1. relay calldata to BrevisRequest.fulfillrequests w/ zero callback addr
     // 2. check msg.sender matches output[0:20]
     // 3. parse output and sum amount
     // 4. uni.transfer
     function claimWithZkProof(
         address receiver, // uni will be sent to this address
         bytes32[] calldata _proofIds,
-        uint64[] calldata _nonces,
-        uint64 _chainId,
         bytes calldata _proof,
         Brevis.ProofData[] calldata _proofDataArray,
-        bytes[] calldata _appCircuitOutputs,
-        address[] calldata _callbackTargets
+        bytes[] calldata _appCircuitOutputs
     ) external {
-        brvReq.fulfillRequests(_proofIds, _nonces, _chainId, _proof, _proofDataArray, _appCircuitOutputs, _callbackTargets);
+        address[] memory zeroAddr = new address[](_proofIds.length);
+        uint64[] memory blkNum = new uint64[](_proofIds.length);
+        for (uint256 i=0;i<_proofIds.length;i++) {
+            blkNum[i] = uint64(block.number);
+            // todo: require _proofDataArray[i].appVkHash == vkhash 
+        }
+        brvReq.fulfillRequests(_proofIds, blkNum, uint64(block.chainid), _proof, _proofDataArray, _appCircuitOutputs, zeroAddr);
         uint256 amount = 0;
         for (uint256 i=0;i<_appCircuitOutputs.length;i++) {
             address sender = address(bytes20(_appCircuitOutputs[i][0:20]));
