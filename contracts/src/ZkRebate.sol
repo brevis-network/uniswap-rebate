@@ -11,14 +11,16 @@ import {IBrevisRequest} from "./IBrevisRequest.sol";
 contract ZkRebate {
     IERC20 public uni;
     IBrevisRequest public brvReq;
+    bytes32 public vkHash;
 
     // per addr, per poolid, last attested blocknum, new proof must have blocknum > lastBlockNum
     mapping(address => mapping(bytes32 => uint64)) lastBlockNum;
     // eligible pools, ie. poolkey.Hooks is non-zero.
     mapping(bytes32 => bool) poolId;
 
-    constructor(IBrevisRequest _brv, IERC20 _uni) {
+    constructor(IBrevisRequest _brv, bytes32 _vkHash, IERC20 _uni) {
         brvReq = _brv;
+        vkHash = _vkHash;
         uni = _uni;
     }
 
@@ -34,7 +36,7 @@ contract ZkRebate {
     // 2. check msg.sender matches output[0:20]
     // 3. parse output and sum amount
     // 4. uni.transfer
-    function claimWithZkProof(
+    function claimWithZkProofs(
         address receiver, // uni will be sent to this address
         bytes32[] calldata _proofIds,
         bytes calldata _proof,
@@ -45,8 +47,9 @@ contract ZkRebate {
         uint64[] memory blkNum = new uint64[](_proofIds.length);
         for (uint256 i=0;i<_proofIds.length;i++) {
             blkNum[i] = uint64(block.number);
-            // todo: require _proofDataArray[i].appVkHash == vkhash 
+            require(_proofDataArray[i].appVkHash == vkHash, "mismatch vkhash");
         }
+        // relay to brevisRequest to verify proof
         brvReq.fulfillRequests(_proofIds, blkNum, uint64(block.chainid), _proof, _proofDataArray, _appCircuitOutputs, zeroAddr);
         uint256 amount = 0;
         for (uint256 i=0;i<_appCircuitOutputs.length;i++) {
