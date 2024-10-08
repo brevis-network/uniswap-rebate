@@ -7,7 +7,7 @@ import (
 )
 
 const (
-	MaxReceipts = 1000
+	MaxReceipts = 3000
 )
 
 var (
@@ -17,16 +17,20 @@ var (
 type GasCircuit struct {
 	PoolMgr sdk.Uint248 // PoolManager addr
 	Sender  sdk.Uint248 // msg.sender of swaps
-	PoolId  sdk.Bytes32 // could change to array for multiple pools in one proof
+	Oracle  sdk.Uint248 // price oracle addr, ratio at slot0, value is ratio*10^18. note this is uni to eth ratio so we divide it to convert eth to uni
+	PoolId  sdk.Bytes32
+	// gas amount of one swap event
+	GasPerSwap sdk.Uint248
 }
 
+// 1 receipt correspond to 1 slot.
 func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 	return MaxReceipts, MaxReceipts, 0
 }
 
-// one receipt has 2 fields, which are same swap log different field (poolid, sender)
+// one receipt has 2 fields, which are same swap log different fields (poolid, sender)
 func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
-	api.AssertInputsAreUnique()
+	// api.AssertInputsAreUnique()
 	receipts := sdk.NewDataStream(api, in.Receipts)
 	// for each receipt, make sure it's from expected pool and msg.sender
 	sdk.AssertEach(receipts, func(r sdk.Receipt) sdk.Uint248 {
@@ -42,14 +46,28 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		)
 	})
 
-	blockNums := sdk.Map(receipts, func(cur sdk.Receipt) sdk.Uint248 { return cur.BlockNum })
+	blockNums := sdk.Map(receipts, func(cur sdk.Receipt) sdk.Uint248 { return api.ToUint248(cur.BlockNum) })
 	minBlockNum := sdk.Min(blockNums)
 	maxBlockNum := sdk.Max(blockNums)
+
+	// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
+	totalUni := api.ToUint248(0)
+	for i := 0; i < len(in.Receipts.Raw); i++ {
+		r := in.Receipts.Raw[i]
+		eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
+		slot := in.StorageSlots.Raw[i]
+		// check slot.BlockNum == r.BlockNum
+		// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
+		eth = api.Uint248.Mul(eth, api.ToUint248(10e18))
+		uni, _ := api.Uint248.Div(eth, api.ToUint248(slot.Value))
+		totalUni = api.Uint248.Add(totalUni, uni)
+	}
 
 	api.OutputAddress(c.Sender)
 	api.OutputBytes32(c.PoolId)
 	api.OutputUint(64, minBlockNum)
 	api.OutputUint(64, maxBlockNum)
+	api.OutputUint(128, totalUni)
 
 	return nil
 }
