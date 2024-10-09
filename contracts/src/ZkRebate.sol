@@ -53,17 +53,16 @@ contract ZkRebate {
         brvReq.fulfillRequests(_proofIds, blkNum, uint64(block.chainid), _proof, _proofDataArray, _appCircuitOutputs, zeroAddr);
         uint256 amount = 0;
         for (uint256 i=0;i<_appCircuitOutputs.length;i++) {
+            // one output has addr, poolid, fromblk, toblk, uni amount
             address sender = address(bytes20(_appCircuitOutputs[i][0:20]));
             require(msg.sender==sender, "mismatch msg.sender and circuit output");
-            for (uint256 idx=20;idx<_appCircuitOutputs[i].length;idx+=64) {
-                bytes32 poolid = bytes32(_appCircuitOutputs[i][idx:idx+32]);
-                if(poolId[poolid]) { // valid pool
-                    uint64 beginBlk = uint64(bytes8(_appCircuitOutputs[i][idx+32:idx+40]));
-                    uint64 endBlk = uint64(bytes8(_appCircuitOutputs[i][idx+40:idx+48]));
-                    if(beginBlk>lastBlockNum[sender][poolid]) {
-                        lastBlockNum[sender][poolid] = endBlk;
-                        amount += uint128(bytes16(_appCircuitOutputs[i][idx+48:idx+64]));
-                    }
+            bytes32 poolid = bytes32(_appCircuitOutputs[i][20:52]);
+            if(poolId[poolid]) { // valid pool
+                uint64 beginBlk = uint64(bytes8(_appCircuitOutputs[i][52:60]));
+                uint64 endBlk = uint64(bytes8(_appCircuitOutputs[i][60:68]));
+                if(beginBlk>lastBlockNum[sender][poolid]) {
+                    lastBlockNum[sender][poolid] = endBlk;
+                    amount += uint128(bytes16(_appCircuitOutputs[i][68:84]));
                 }
             }
         }

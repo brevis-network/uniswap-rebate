@@ -23,14 +23,18 @@ type GasCircuit struct {
 	GasPerSwap sdk.Uint248
 }
 
-// 1 receipt correspond to 1 slot.
+// 1 receipt corresponds to 1 slot
 func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 	return MaxReceipts, MaxReceipts, 0
 }
 
 // one receipt has 2 fields, which are same swap log different fields (poolid, sender)
+// receipts must be ordered by block num and if multiple receipts have same block num,
+// only first corresponding slot has actual data, rests are dummy
+// receipts: b1r1, b1r2, b1r3, b2r1
+// slots: b1s1, 0, 0, b2s1
 func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
-	// api.AssertInputsAreUnique()
+	api.AssertInputsAreUnique()
 	receipts := sdk.NewDataStream(api, in.Receipts)
 	// for each receipt, make sure it's from expected pool and msg.sender
 	sdk.AssertEach(receipts, func(r sdk.Receipt) sdk.Uint248 {
@@ -52,14 +56,21 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 
 	// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
 	totalUni := api.ToUint248(0)
+	lastRatio := api.ToUint248(0)
 	for i := 0; i < len(in.Receipts.Raw); i++ {
 		r := in.Receipts.Raw[i]
 		eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
 		slot := in.StorageSlots.Raw[i]
-		// check slot.BlockNum == r.BlockNum
+		// check slot.BlockNum == r.BlockNum if slot isn't dummy
+		// if slot.BlockNum is 0, use last ratio
+		lastRatio = api.Uint248.Select(
+			api.Uint248.IsZero(sdk.Uint248(slot.BlockNum)),
+			lastRatio,
+			api.ToUint248(slot.Value),
+		)
 		// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
 		eth = api.Uint248.Mul(eth, api.ToUint248(10e18))
-		uni, _ := api.Uint248.Div(eth, api.ToUint248(slot.Value))
+		uni, _ := api.Uint248.Div(eth, lastRatio)
 		totalUni = api.Uint248.Add(totalUni, uni)
 	}
 
