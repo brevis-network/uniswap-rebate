@@ -10,9 +10,4 @@ library Brevis {
         bytes32 appVkHash; // zk-program computing circuit Verify Key hash
         bytes32 smtRoot;
     }
-
-    struct ProofAppData {
-        bytes32 appCommitHash;
-        bytes32 appVkHash;
-    }
 }
