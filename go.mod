@@ -9,6 +9,7 @@ require (
 	github.com/StackExchange/wmi v1.2.1 // indirect
 	github.com/bits-and-blooms/bitset v1.10.0 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
+	github.com/brevis-network/zk-hash v0.0.0-20240903111749-fedffbe8a45c // indirect
 	github.com/brevis-network/zk-utils v0.0.0-20240916014259-e0a7a7e4fcda // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/cbergoon/merkletree v0.2.0 // indirect
@@ -33,8 +34,8 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway v1.16.0 // indirect
 	github.com/holiman/uint256 v1.3.1 // indirect
 	github.com/huin/goupnp v1.3.0 // indirect
-	github.com/ingonyama-zk/icicle v0.1.1-0.20240120093837-db9eff751859 // indirect
-	github.com/ingonyama-zk/iciclegnark v0.1.2-0.20240120100015-8653136f9db4 // indirect
+	github.com/iden3/go-iden3-crypto v0.0.15 // indirect
+	github.com/ingonyama-zk/icicle/v2 v2.0.3 // indirect
 	github.com/jackpal/go-nat-pmp v1.0.2 // indirect
 	github.com/jedib0t/go-pretty/v6 v6.5.4 // indirect
 	github.com/mattn/go-colorable v0.1.13 // indirect
@@ -53,12 +54,10 @@ require (
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/crypto v0.26.0 // indirect
 	golang.org/x/exp v0.0.0-20231110203233-9a3e6036ecaa // indirect
-	golang.org/x/mod v0.17.0 // indirect
 	golang.org/x/net v0.25.0 // indirect
 	golang.org/x/sync v0.8.0 // indirect
 	golang.org/x/sys v0.23.0 // indirect
 	golang.org/x/text v0.17.0 // indirect
-	golang.org/x/tools v0.21.1-0.20240508182429-e35e4ccd0d2d // indirect
 	google.golang.org/genproto v0.0.0-20210624195500-8bfb893ecb84 // indirect
 	google.golang.org/grpc v1.38.0 // indirect
 	google.golang.org/protobuf v1.34.2 // indirect

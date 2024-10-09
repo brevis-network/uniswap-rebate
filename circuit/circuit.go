@@ -7,11 +7,11 @@ import (
 )
 
 const (
-	MaxReceipts = 3000
+	MaxReceipts = 32
 )
 
 var (
-	EventIdSwap = sdk.ParseEventID(Hex2Bytes(""))
+	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
 )
 
 type GasCircuit struct {
@@ -55,13 +55,18 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	maxBlockNum := sdk.Max(blockNums)
 
 	// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
-	totalUni := api.ToUint248(0)
-	lastRatio := api.ToUint248(0)
+	totalUni := sdk.ConstUint248(0)
+	lastRatio := sdk.ConstUint248(0)
 	for i := 0; i < len(in.Receipts.Raw); i++ {
 		r := in.Receipts.Raw[i]
 		eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
 		slot := in.StorageSlots.Raw[i]
-		// check slot.BlockNum == r.BlockNum if slot isn't dummy
+		// if slot blocknum isn't 0, receipt blocknum shoould equal slot blocknum
+		api.Uint32.AssertIsEqual(r.BlockNum, api.Uint32.Select(
+			api.Uint32.IsZero(slot.BlockNum),
+			r.BlockNum,
+			slot.BlockNum,
+		))
 		// if slot.BlockNum is 0, use last ratio
 		lastRatio = api.Uint248.Select(
 			api.Uint248.IsZero(sdk.Uint248(slot.BlockNum)),
@@ -69,7 +74,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 			api.ToUint248(slot.Value),
 		)
 		// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
-		eth = api.Uint248.Mul(eth, api.ToUint248(10e18))
+		eth = api.Uint248.Mul(eth, sdk.ConstUint248(1e18))
 		uni, _ := api.Uint248.Div(eth, lastRatio)
 		totalUni = api.Uint248.Add(totalUni, uni)
 	}
