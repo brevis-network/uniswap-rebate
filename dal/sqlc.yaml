@@ -1,0 +1,21 @@
+version: "1"
+packages:
+  - name: "dal"
+    path: "."
+    queries: "./queries.sql"
+    schema: "./schema.sql"
+    emit_json_tags: true
+    json_tags_case_style: "camel"
+
+overrides:
+  - go_type: "uint64"
+    column: "monitor.blknum"
+  - go_type: "int64"
+    column: "monitor.blkidx"
+  - go_type: "uint64"
+    column: "pools.chid"
+  - go_type: "github.com/brevis-network/uniswap-rebate/binding.PoolKey"
+    column: "pools.poolkey"
+  - go_type: "github.com/brevis-network/uniswap-rebate/binding.CallData"
+    column: "reqs.calldata"
+  

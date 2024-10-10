@@ -2,7 +2,12 @@ module github.com/brevis-network/uniswap-rebate
 
 go 1.21.8
 
-require github.com/brevis-network/brevis-sdk v0.0.0-20241008133620-27c0199f5d74
+require (
+	github.com/brevis-network/brevis-sdk v0.0.0-20241008133620-27c0199f5d74
+	github.com/cockroachdb/cockroach-go/v2 v2.3.8
+	github.com/ethereum/go-ethereum v1.14.8
+	github.com/lib/pq v1.10.6
+)
 
 require (
 	github.com/Microsoft/go-winio v0.6.2 // indirect
@@ -22,7 +27,6 @@ require (
 	github.com/deckarep/golang-set/v2 v2.6.0 // indirect
 	github.com/decred/dcrd/dcrec/secp256k1/v4 v4.0.1 // indirect
 	github.com/ethereum/c-kzg-4844 v1.0.0 // indirect
-	github.com/ethereum/go-ethereum v1.14.8 // indirect
 	github.com/fsnotify/fsnotify v1.6.0 // indirect
 	github.com/fxamacker/cbor/v2 v2.5.0 // indirect
 	github.com/go-ole/go-ole v1.3.0 // indirect
