@@ -1,0 +1,58 @@
+
+syntax = "proto3";
+
+import "google/api/annotations.proto";
+
+option go_package = "github.com/brevis-network/uniswap-rebate/webapi";
+
+service Web {
+    rpc NewProof(NewProofReq) returns (NewProofResp) {
+        option (google.api.http) = {
+            get: "/zk/new"
+        };
+    }
+
+    rpc GetProof(GetProofReq) returns (GetProofResp) {
+        option (google.api.http) = {
+            get: "/zk/get/{reqid}"
+        };
+    }
+}
+
+// sign?chainId=1&campaignId=1&txnHashes=0x123,0x456
+// we have to be compatible w/ uni's impl, so txnHashes can't be repeated
+message NewProofReq {
+    uint64 chain_id = 1;
+    uint64 campaign_id = 2; // will be ignored as zk doesn't support campaign
+    string txn_hashes = 3;
+}
+
+message NewProofResp {
+    uint64 reqid = 1; // unique id for later query
+    string errmsg = 2; // if runinto any err, reqid will be 0 and err details in errmsg
+}
+
+message GetProofReq {
+    uint64 reqid = 1;
+}
+
+message GetProofResp {
+    uint64 reqid = 1;
+    string status = 2; // info about this req, eg. which step, any err
+    CallData calldata = 3;
+}
+
+message CallData {
+    repeated string proof_ids = 1; // each string is hex of [32]byte
+    string proof = 2; // hex of []byte
+    repeated BrevisProofData proof_data_array = 3;
+    repeated string app_circuit_outputs = 4; // each string is hex of []byte
+}
+
+message BrevisProofData {
+    string commit_hash = 1;
+    string vk_hash = 2;
+    string app_commit_hash = 3;
+    string app_vk_hash = 4;
+    string smt_root = 5;
+}
