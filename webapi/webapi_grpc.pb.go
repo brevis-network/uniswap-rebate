@@ -18,120 +18,120 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// WebClient is the client API for Web service.
+// UniRebateClient is the client API for UniRebate service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type WebClient interface {
+type UniRebateClient interface {
 	NewProof(ctx context.Context, in *NewProofReq, opts ...grpc.CallOption) (*NewProofResp, error)
 	GetProof(ctx context.Context, in *GetProofReq, opts ...grpc.CallOption) (*GetProofResp, error)
 }
 
-type webClient struct {
+type uniRebateClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewWebClient(cc grpc.ClientConnInterface) WebClient {
-	return &webClient{cc}
+func NewUniRebateClient(cc grpc.ClientConnInterface) UniRebateClient {
+	return &uniRebateClient{cc}
 }
 
-func (c *webClient) NewProof(ctx context.Context, in *NewProofReq, opts ...grpc.CallOption) (*NewProofResp, error) {
+func (c *uniRebateClient) NewProof(ctx context.Context, in *NewProofReq, opts ...grpc.CallOption) (*NewProofResp, error) {
 	out := new(NewProofResp)
-	err := c.cc.Invoke(ctx, "/Web/NewProof", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/UniRebate/NewProof", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *webClient) GetProof(ctx context.Context, in *GetProofReq, opts ...grpc.CallOption) (*GetProofResp, error) {
+func (c *uniRebateClient) GetProof(ctx context.Context, in *GetProofReq, opts ...grpc.CallOption) (*GetProofResp, error) {
 	out := new(GetProofResp)
-	err := c.cc.Invoke(ctx, "/Web/GetProof", in, out, opts...)
+	err := c.cc.Invoke(ctx, "/UniRebate/GetProof", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-// WebServer is the server API for Web service.
-// All implementations should embed UnimplementedWebServer
+// UniRebateServer is the server API for UniRebate service.
+// All implementations should embed UnimplementedUniRebateServer
 // for forward compatibility
-type WebServer interface {
+type UniRebateServer interface {
 	NewProof(context.Context, *NewProofReq) (*NewProofResp, error)
 	GetProof(context.Context, *GetProofReq) (*GetProofResp, error)
 }
 
-// UnimplementedWebServer should be embedded to have forward compatible implementations.
-type UnimplementedWebServer struct {
+// UnimplementedUniRebateServer should be embedded to have forward compatible implementations.
+type UnimplementedUniRebateServer struct {
 }
 
-func (UnimplementedWebServer) NewProof(context.Context, *NewProofReq) (*NewProofResp, error) {
+func (UnimplementedUniRebateServer) NewProof(context.Context, *NewProofReq) (*NewProofResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method NewProof not implemented")
 }
-func (UnimplementedWebServer) GetProof(context.Context, *GetProofReq) (*GetProofResp, error) {
+func (UnimplementedUniRebateServer) GetProof(context.Context, *GetProofReq) (*GetProofResp, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetProof not implemented")
 }
 
-// UnsafeWebServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to WebServer will
+// UnsafeUniRebateServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to UniRebateServer will
 // result in compilation errors.
-type UnsafeWebServer interface {
-	mustEmbedUnimplementedWebServer()
+type UnsafeUniRebateServer interface {
+	mustEmbedUnimplementedUniRebateServer()
 }
 
-func RegisterWebServer(s grpc.ServiceRegistrar, srv WebServer) {
-	s.RegisterService(&Web_ServiceDesc, srv)
+func RegisterUniRebateServer(s grpc.ServiceRegistrar, srv UniRebateServer) {
+	s.RegisterService(&UniRebate_ServiceDesc, srv)
 }
 
-func _Web_NewProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _UniRebate_NewProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(NewProofReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WebServer).NewProof(ctx, in)
+		return srv.(UniRebateServer).NewProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Web/NewProof",
+		FullMethod: "/UniRebate/NewProof",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WebServer).NewProof(ctx, req.(*NewProofReq))
+		return srv.(UniRebateServer).NewProof(ctx, req.(*NewProofReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-func _Web_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+func _UniRebate_GetProof_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetProofReq)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(WebServer).GetProof(ctx, in)
+		return srv.(UniRebateServer).GetProof(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: "/Web/GetProof",
+		FullMethod: "/UniRebate/GetProof",
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(WebServer).GetProof(ctx, req.(*GetProofReq))
+		return srv.(UniRebateServer).GetProof(ctx, req.(*GetProofReq))
 	}
 	return interceptor(ctx, in, info, handler)
 }
 
-// Web_ServiceDesc is the grpc.ServiceDesc for Web service.
+// UniRebate_ServiceDesc is the grpc.ServiceDesc for UniRebate service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var Web_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "Web",
-	HandlerType: (*WebServer)(nil),
+var UniRebate_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "UniRebate",
+	HandlerType: (*UniRebateServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
 			MethodName: "NewProof",
-			Handler:    _Web_NewProof_Handler,
+			Handler:    _UniRebate_NewProof_Handler,
 		},
 		{
 			MethodName: "GetProof",
-			Handler:    _Web_GetProof_Handler,
+			Handler:    _UniRebate_GetProof_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

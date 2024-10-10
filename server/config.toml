@@ -1,0 +1,13 @@
+db = "localhost:26257"
+grpcport = 9001
+httpport = 9002
+
+[[multichain]]
+chainID = 97
+name = "BscTest"
+gateway = "https://bsc-testnet-rpc.publicnode.com"
+BlkInterval = 5
+BlkDelay = 1
+
+PoolMgr = ""
+VkHash = ""
