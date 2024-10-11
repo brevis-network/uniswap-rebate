@@ -8,6 +8,8 @@ import (
 	"net"
 	"net/http"
 
+	"github.com/brevis-network/uniswap-rebate/dal"
+	"github.com/brevis-network/uniswap-rebate/onchain"
 	"github.com/brevis-network/uniswap-rebate/webapi"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/spf13/viper"
@@ -23,6 +25,16 @@ func main() {
 	viper.SetConfigFile(*fcfg)
 	err := viper.ReadInConfig()
 	chkErr(err, "viper ReadInConfig")
+
+	dal, err := dal.NewDAL(viper.GetString("db"))
+	chkErr(err, "new dal")
+
+	cfgs := onchain.GetMcc("multichain")
+	for _, cfg := range cfgs {
+		onec, err := onchain.NewOneChain(cfg, dal)
+		chkErr(err, "NewOneChain"+cfg.Name)
+		onec.MonPoolInit()
+	}
 
 	// start grpc server, only listens on localhost
 	grpcEndpoint := fmt.Sprintf("localhost:%d", viper.GetInt("grpcport"))

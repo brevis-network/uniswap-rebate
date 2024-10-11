@@ -41,7 +41,7 @@ require (
 	github.com/brevis-network/zk-utils v0.0.0-20240916014259-e0a7a7e4fcda // indirect
 	github.com/btcsuite/btcd/btcec/v2 v2.3.4 // indirect
 	github.com/cbergoon/merkletree v0.2.0 // indirect
-	github.com/celer-network/goutils v0.2.0 // indirect
+	github.com/celer-network/goutils v0.2.0
 	github.com/consensys/bavard v0.1.13 // indirect
 	github.com/consensys/gnark v0.10.0 // indirect
 	github.com/consensys/gnark-crypto v0.12.2-0.20240215234832-d72fcb379d3e // indirect
