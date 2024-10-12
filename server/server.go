@@ -2,7 +2,11 @@ package main
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"log"
+	"os"
+	"strings"
 	"time"
 
 	"github.com/brevis-network/uniswap-rebate/dal"
@@ -13,18 +17,64 @@ type Server struct {
 	db *dal.DAL
 }
 
-func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (*webapi.NewProofResp, error) {
+func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *webapi.NewProofResp, err error) {
 	log.Println(req)
-	ret := &webapi.NewProofResp{
-		Reqid: uint64(time.Now().Unix()),
+	ret = new(webapi.NewProofResp)
+	// parse and get tx receipt now even though it may take a long time for this api to return
+	// so client knows error immediately instead of later polling
+	onec, ok := chainMap[req.ChainId]
+	if !ok {
+		ret.Errmsg = fmt.Sprintf("unsupported chainid %d", req.ChainId)
+		return
 	}
+	txList := strings.Split(req.TxnHashes, ",")
+	receipts, err := onec.FetchTxReceipts(txList)
+	if err != nil {
+		ret.Errmsg = "get receipts err: " + err.Error()
+		return
+	}
+	reqid := time.Now().Unix()
+	err = s.db.ReqAdd(context.Background(), dal.ReqAddParams{
+		ID:       reqid,
+		Proofreq: req,
+	})
+	if err != nil {
+		ret.Errmsg = "db err: " + err.Error()
+		return
+	}
+
+	// save json file in case need to resume
+	fname := fmt.Sprintf("%s/%d-receipts.json", *fdir, reqid)
+	raw, _ := json.Marshal(receipts)
+	err = os.WriteFile(fname, raw, os.ModePerm)
+	if err != nil {
+		ret.Errmsg = "save receipts err: " + err.Error()
+		return
+	}
+	// check logs in receipts and prepare proof etc
+	go func() {
+		prvR := onec.ProcessReceipts(reqid, receipts)
+		if len(prvR) > 0 {
+			fname = fmt.Sprintf("%s/%d-proveReqs.json", *fdir, reqid)
+			raw, _ := json.Marshal(prvR)
+			os.WriteFile(fname, raw, os.ModePerm)
+		}
+	}()
+
+	// good to return
+	ret.Reqid = uint64(reqid)
 	return ret, nil
 }
 
 func (s *Server) GetProof(ctx context.Context, req *webapi.GetProofReq) (*webapi.GetProofResp, error) {
-	log.Println(req)
 	ret := &webapi.GetProofResp{
 		Reqid: req.Reqid,
 	}
+	oneReq, err := s.db.ReqGet(context.Background(), int64(req.Reqid))
+	if err != nil {
+		return ret, err
+	}
+	// ret.Status
+	ret.Calldata = oneReq.Calldata.ToWebCallData()
 	return ret, nil
 }

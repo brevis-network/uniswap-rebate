@@ -9,5 +9,7 @@ gateway = "https://bsc-testnet-rpc.publicnode.com"
 BlkInterval = 5
 BlkDelay = 1
 
+GasPerSwap = 50000
 PoolMgr = ""
+Oracle = ""
 VkHash = ""

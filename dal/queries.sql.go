@@ -7,7 +7,7 @@ import (
 	"context"
 
 	"github.com/brevis-network/uniswap-rebate/binding"
-	"github.com/lib/pq"
+	"github.com/brevis-network/uniswap-rebate/webapi"
 )
 
 const monGet = `-- name: MonGet :one
@@ -62,16 +62,59 @@ func (q *Queries) PoolGet(ctx context.Context, poolid string) (binding.PoolKey, 
 	return poolkey, err
 }
 
+const poolIds = `-- name: PoolIds :many
+SELECT poolid FROM pools
+`
+
+func (q *Queries) PoolIds(ctx context.Context) ([]string, error) {
+	rows, err := q.db.QueryContext(ctx, poolIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []string
+	for rows.Next() {
+		var poolid string
+		if err := rows.Scan(&poolid); err != nil {
+			return nil, err
+		}
+		items = append(items, poolid)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const reqAdd = `-- name: ReqAdd :exec
-INSERT INTO reqs (id, txs) VALUES ($1, $2)
+INSERT INTO reqs (id, proofreq) VALUES ($1, $2)
 `
 
 type ReqAddParams struct {
-	ID  int64    `json:"id"`
-	Txs []string `json:"txs"`
+	ID       int64               `json:"id"`
+	Proofreq *webapi.NewProofReq `json:"proofreq"`
 }
 
 func (q *Queries) ReqAdd(ctx context.Context, arg ReqAddParams) error {
-	_, err := q.db.ExecContext(ctx, reqAdd, arg.ID, pq.Array(arg.Txs))
+	_, err := q.db.ExecContext(ctx, reqAdd, arg.ID, arg.Proofreq)
 	return err
+}
+
+const reqGet = `-- name: ReqGet :one
+SELECT id, step, proofreq, calldata FROM reqs WHERE id = $1
+`
+
+func (q *Queries) ReqGet(ctx context.Context, id int64) (Req, error) {
+	row := q.db.QueryRowContext(ctx, reqGet, id)
+	var i Req
+	err := row.Scan(
+		&i.ID,
+		&i.Step,
+		&i.Proofreq,
+		&i.Calldata,
+	)
+	return i, err
 }

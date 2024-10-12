@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"net/http"
+	"os"
 
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/brevis-network/uniswap-rebate/onchain"
@@ -18,6 +19,9 @@ import (
 
 var (
 	fcfg = flag.String("c", "config.toml", "config toml file")
+	fdir = flag.String("d", "data", "directory path for data files")
+	// chainid -> onechain
+	chainMap map[uint64]*onchain.OneChain
 )
 
 func main() {
@@ -26,13 +30,22 @@ func main() {
 	err := viper.ReadInConfig()
 	chkErr(err, "viper ReadInConfig")
 
-	dal, err := dal.NewDAL(viper.GetString("db"))
+	// check fdir is writable
+	f, err := os.CreateTemp(*fdir, "tmp")
+	chkErr(err, "fail to write to dir: "+*fdir)
+	f.Close()
+	os.Remove(f.Name())
+
+	// setup db
+	db, err := dal.NewDAL(viper.GetString("db"))
 	chkErr(err, "new dal")
 
+	chainMap = make(map[uint64]*onchain.OneChain)
 	cfgs := onchain.GetMcc("multichain")
 	for _, cfg := range cfgs {
-		onec, err := onchain.NewOneChain(cfg, dal)
+		onec, err := onchain.NewOneChain(cfg, db)
 		chkErr(err, "NewOneChain"+cfg.Name)
+		chainMap[cfg.ChainID] = onec
 		onec.MonPoolInit()
 	}
 
@@ -41,7 +54,9 @@ func main() {
 	lis, err := net.Listen("tcp", grpcEndpoint)
 	chkErr(err, "listen")
 
-	svr := new(Server)
+	svr := &Server{
+		db: db,
+	}
 	gs := grpc.NewServer()
 	webapi.RegisterUniRebateServer(gs, svr)
 	go func() {

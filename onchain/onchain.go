@@ -4,6 +4,8 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
+	"math/big"
+	"sort"
 	"time"
 
 	"github.com/brevis-network/uniswap-rebate/binding"
@@ -18,34 +20,41 @@ import (
 const (
 	GetLogIntv   = time.Second * 60
 	PoolInitEvId = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438"
+	SwapEvId     = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
 )
 
 var (
 	ZeroAddr common.Address
+	ZeroHash common.Hash
 )
-
-func Hex2addr(addr string) common.Address {
-	return common.HexToAddress(addr)
-}
-
-// 0x prefix, only hex, all lower case
-func Addr2hex(addr common.Address) string {
-	return "0x" + hex.EncodeToString(addr[:])
-}
-
-func Hex2hash(hexstr string) common.Hash {
-	return common.HexToHash(hexstr)
-}
-
-func Hash2Hex(h [32]byte) string {
-	return "0x" + hex.EncodeToString(h[:])
-}
 
 type OneChain struct {
 	*OneChainConfig
 	ec  *ethclient.Client
 	mon *mon2.Monitor
 	db  *dal.DAL
+}
+
+type OneLog struct {
+	Swap         *types.Log
+	LogIdxOffset uint
+}
+
+type OneBlock struct {
+	BaseFee   uint64
+	SlotValue [32]byte
+}
+
+// all needed for one circuit proof
+type OneProveReq struct {
+	ChainId, GasPerSwap     uint64
+	PoolMgr, Sender, Oracle string
+	// poolid is in log, add here to save prover some work
+	PoolId string
+	// all logs have same poolid and sender, sorted by blknum
+	Logs []OneLog
+	// blknum -> info about at this block, may have more than logs need
+	Blks map[uint64]OneBlock
 }
 
 // return err if dial fail or chainid mismatch
@@ -123,4 +132,119 @@ func (c *OneChain) MonPoolInit() {
 			log.Errorln("pooladd err:", err)
 		}
 	})
+}
+
+// txlist is hex string of tx hash, return non-nil err if any TransactionReceipt has err
+func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
+	var ret []*types.Receipt
+	for _, tx := range txlist {
+		r, err := c.ec.TransactionReceipt(context.Background(), Hex2hash(tx))
+		if err != nil {
+			return ret, err
+		}
+		ret = append(ret, r)
+	}
+	return ret, nil
+}
+
+// go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr)
+// group by poolid, fetch block basefee and storage, return ready to use start prove reqs
+func (c *OneChain) ProcessReceipts(reqid int64, receipts []*types.Receipt) []*OneProveReq {
+	poolids, _ := c.db.PoolIds(context.Background())
+	poolidMap := make(map[[32]byte]bool)
+	for _, pid := range poolids {
+		poolidMap[Hex2hash(pid)] = true
+	}
+	// poolid to list of entries
+	logByPool := make(map[[32]byte][]OneLog)
+	pmAddr := Hex2addr(c.PoolMgr)
+	oracle := Hex2addr(c.Oracle)
+	swapEvId := Hex2hash(SwapEvId)
+	var sender common.Address // default zero addr, will be set from first eligible log
+
+	blkMap := make(map[uint64]OneBlock)
+	for _, r := range receipts {
+		// all logs in one receipt has same logIdxOffset
+		logIdxOffset := r.Logs[0].Index
+		for _, l := range r.Logs {
+			if l.Address == pmAddr && l.Topics[0] == swapEvId {
+				poolid := l.Topics[1]
+				if !poolidMap[poolid] {
+					// skip ineligible poolids
+					continue
+				}
+				// first eligible log, set sender
+				logSender := common.BytesToAddress(l.Topics[2][12:])
+				if sender == ZeroAddr {
+					sender = logSender
+				} else if sender != logSender {
+					// skip if sender already set but logSender is different
+					continue
+				}
+				// now append log to correct list
+				logByPool[poolid] = append(logByPool[poolid], OneLog{
+					Swap:         l,
+					LogIdxOffset: logIdxOffset,
+				})
+				// new blocknum, we could make the map at OneChain level or save to db as info is immutable
+				if _, ok := blkMap[l.BlockNumber]; !ok {
+					// get basefee and slot
+					blkNum := new(big.Int).SetUint64(l.BlockNumber)
+					b, err := c.ec.BlockByNumber(context.Background(), blkNum)
+					if err != nil {
+						log.Errorln("get block", l.BlockNumber, "err:", err)
+						continue
+					}
+					value, err := c.ec.StorageAt(context.Background(), oracle, ZeroHash, blkNum)
+					if err != nil {
+						log.Errorln("StorageAt", l.BlockNumber, oracle, "err:", err)
+						continue
+					}
+					var slotV common.Hash
+					copy(slotV[32-len(value):], value)
+					blkMap[l.BlockNumber] = OneBlock{
+						BaseFee:   b.BaseFee().Uint64(),
+						SlotValue: slotV,
+					}
+				}
+			}
+		}
+	}
+	var proveReqs []*OneProveReq
+	// for each poolid, creates OneProveReq obj
+	for pid, logs := range logByPool {
+		// new go version creates logs in each loop iter so ok to reuse
+		// sort logs in place by blocknum
+		sort.Slice(logs, func(i, j int) bool {
+			return logs[i].Swap.BlockNumber < logs[j].Swap.BlockNumber
+		})
+		proveReqs = append(proveReqs, &OneProveReq{
+			ChainId:    c.ChainID,
+			GasPerSwap: c.GasPerSwap,
+			PoolMgr:    c.PoolMgr,
+			Sender:     Addr2hex(sender),
+			Oracle:     c.Oracle,
+			PoolId:     Hash2Hex(pid),
+			Logs:       logs,
+			Blks:       blkMap,
+		})
+	}
+	return proveReqs
+}
+
+func Hex2addr(addr string) common.Address {
+	return common.HexToAddress(addr)
+}
+
+// 0x prefix, only hex, all lower case
+func Addr2hex(addr common.Address) string {
+	return "0x" + hex.EncodeToString(addr[:])
+}
+
+func Hex2hash(hexstr string) common.Hash {
+	return common.HexToHash(hexstr)
+}
+
+func Hash2Hex(h [32]byte) string {
+	return "0x" + hex.EncodeToString(h[:])
 }

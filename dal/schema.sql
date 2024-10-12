@@ -13,8 +13,8 @@ CREATE TABLE IF NOT EXISTS pools (
 
 CREATE TABLE IF NOT EXISTS reqs (
     id BIGINT PRIMARY KEY, -- epoch seconds when requested
-    step INT NOT NULL DEFAULT 0, -- 0: fetching txs receipts 1: got all receipts, doing app circuit prove 2: sent to Brevis gw for final proof 3: have data ready to submit
-    txs TEXT[] NOT NULL, -- list of tx hashes in request
+    step INT NOT NULL DEFAULT 0, -- 0: fetching tx receipts done 1: started app circuit proof 2: has app proof, sent to Brevis gw for final proof 3: have data ready to submit
+    proofreq JSONB NOT NULL, -- webapi.NewProofReq
     calldata JSONB -- only not null if step is 3 (received ready to send onchain data from Brevis gw)
 );
 

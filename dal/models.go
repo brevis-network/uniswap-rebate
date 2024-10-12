@@ -4,6 +4,7 @@ package dal
 
 import (
 	"github.com/brevis-network/uniswap-rebate/binding"
+	"github.com/brevis-network/uniswap-rebate/webapi"
 )
 
 type Monitor struct {
@@ -19,8 +20,8 @@ type Pool struct {
 }
 
 type Req struct {
-	ID       int64            `json:"id"`
-	Step     int32            `json:"step"`
-	Txs      []string         `json:"txs"`
-	Calldata binding.CallData `json:"calldata"`
+	ID       int64               `json:"id"`
+	Step     int32               `json:"step"`
+	Proofreq *webapi.NewProofReq `json:"proofreq"`
+	Calldata binding.CallData    `json:"calldata"`
 }

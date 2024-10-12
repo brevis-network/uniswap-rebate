@@ -18,4 +18,6 @@ overrides:
     column: "pools.poolkey"
   - go_type: "github.com/brevis-network/uniswap-rebate/binding.CallData"
     column: "reqs.calldata"
+  - go_type: "*github.com/brevis-network/uniswap-rebate/webapi.NewProofReq"
+    column: "reqs.proofreq"
   
