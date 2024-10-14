@@ -53,7 +53,7 @@ type OneProveReq struct {
 	PoolId string
 	// all logs have same poolid and sender, sorted by blknum
 	Logs []OneLog
-	// blknum -> info about at this block, may have more than logs need
+	// blknum -> info about at this block, include all blocknums from Logs
 	Blks map[uint64]OneBlock
 }
 
@@ -218,6 +218,11 @@ func (c *OneChain) ProcessReceipts(reqid int64, receipts []*types.Receipt) []*On
 		sort.Slice(logs, func(i, j int) bool {
 			return logs[i].Swap.BlockNumber < logs[j].Swap.BlockNumber
 		})
+		// a subset of all blkMap
+		subBlkMap := make(map[uint64]OneBlock)
+		for _, l := range logs {
+			subBlkMap[l.Swap.BlockNumber] = blkMap[l.Swap.BlockNumber]
+		}
 		proveReqs = append(proveReqs, &OneProveReq{
 			ChainId:    c.ChainID,
 			GasPerSwap: c.GasPerSwap,
@@ -226,7 +231,7 @@ func (c *OneChain) ProcessReceipts(reqid int64, receipts []*types.Receipt) []*On
 			Oracle:     c.Oracle,
 			PoolId:     Hash2Hex(pid),
 			Logs:       logs,
-			Blks:       blkMap,
+			Blks:       subBlkMap,
 		})
 	}
 	return proveReqs
