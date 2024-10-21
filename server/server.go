@@ -33,16 +33,8 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 		ret.Errmsg = "get receipts err: " + err.Error()
 		return
 	}
-	reqid := time.Now().Unix()
-	err = s.db.ReqAdd(context.Background(), dal.ReqAddParams{
-		ID:       reqid,
-		Proofreq: req,
-	})
-	if err != nil {
-		ret.Errmsg = "db err: " + err.Error()
-		return
-	}
 
+	reqid := time.Now().Unix()
 	// save json file in case need to resume
 	fname := fmt.Sprintf("%s/%d-receipts.json", *fdir, reqid)
 	raw, _ := json.Marshal(receipts)
@@ -51,15 +43,30 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 		ret.Errmsg = "save receipts err: " + err.Error()
 		return
 	}
+
 	// check logs in receipts and prepare proof etc
-	go func() {
-		prvR := onec.ProcessReceipts(reqid, receipts)
-		if len(prvR) > 0 {
-			fname = fmt.Sprintf("%s/%d-proveReqs.json", *fdir, reqid)
-			raw, _ := json.Marshal(prvR)
-			os.WriteFile(fname, raw, os.ModePerm)
-		}
-	}()
+	prvR, err := onec.ProcessReceipts(receipts)
+	if err != nil {
+		ret.Errmsg = "ProcessReceipts err: " + err.Error()
+		return
+	}
+
+	if len(prvR) > 0 {
+		fname = fmt.Sprintf("%s/%d-proveReqs.json", *fdir, reqid)
+		raw, _ := json.Marshal(prvR)
+		os.WriteFile(fname, raw, os.ModePerm)
+	}
+	// submit to app prover
+
+	// save req to db
+	err = s.db.ReqAdd(context.Background(), dal.ReqAddParams{
+		ID:       reqid,
+		Proofreq: req,
+	})
+	if err != nil {
+		ret.Errmsg = "db err: " + err.Error()
+		return
+	}
 
 	// good to return
 	ret.Reqid = uint64(reqid)

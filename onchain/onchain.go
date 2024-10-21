@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/brevis-network/uniswap-rebate/binding"
+	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/celer-network/goutils/eth/mon2"
 	"github.com/celer-network/goutils/log"
@@ -45,16 +46,27 @@ type OneBlock struct {
 	SlotValue [32]byte
 }
 
-// all needed for one circuit proof
+// all needed for one circuit proof, supports multi pools
 type OneProveReq struct {
 	ChainId, GasPerSwap     uint64
 	PoolMgr, Sender, Oracle string
-	// poolid is in log, add here to save prover some work
-	PoolId string
-	// all logs have same poolid and sender, sorted by blknum
+	// unique poolids from logs
+	PoolIds []string
+	// all logs have same sender, sorted by blknum
 	Logs []OneLog
 	// blknum -> info about at this block, include all blocknums from Logs
 	Blks map[uint64]OneBlock
+}
+
+// sort logs and populate Blks from m
+func (r *OneProveReq) Fix(m map[uint64]OneBlock) {
+	sort.Slice(r.Logs, func(i, j int) bool {
+		return r.Logs[i].Swap.BlockNumber < r.Logs[j].Swap.BlockNumber
+	})
+	for _, l := range r.Logs {
+		// ok to set again as it's same anyway
+		r.Blks[l.Swap.BlockNumber] = m[l.Swap.BlockNumber]
+	}
 }
 
 // return err if dial fail or chainid mismatch
@@ -148,8 +160,8 @@ func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 }
 
 // go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr)
-// group by poolid, fetch block basefee and storage, return ready to use start prove reqs
-func (c *OneChain) ProcessReceipts(reqid int64, receipts []*types.Receipt) []*OneProveReq {
+// fetch block basefee and storage, return ready to use start prove reqs
+func (c *OneChain) ProcessReceipts(receipts []*types.Receipt) ([]*OneProveReq, error) {
 	poolids, _ := c.db.PoolIds(context.Background())
 	poolidMap := make(map[[32]byte]bool)
 	for _, pid := range poolids {
@@ -210,31 +222,46 @@ func (c *OneChain) ProcessReceipts(reqid int64, receipts []*types.Receipt) []*On
 			}
 		}
 	}
+
+	// OneProveReq supports up to MaxReceipts and MaxPoolNum
+	// so we need to split into multiple requests if logByPool has more
+	// use simple algo for now
+
 	var proveReqs []*OneProveReq
-	// for each poolid, creates OneProveReq obj
+	var poolCnt, logCnt int // pool and log in this batch
+	curProveReq := c.NewOneProveReq(sender)
 	for pid, logs := range logByPool {
-		// new go version creates logs in each loop iter so ok to reuse
-		// sort logs in place by blocknum
-		sort.Slice(logs, func(i, j int) bool {
-			return logs[i].Swap.BlockNumber < logs[j].Swap.BlockNumber
-		})
-		// a subset of all blkMap
-		subBlkMap := make(map[uint64]OneBlock)
-		for _, l := range logs {
-			subBlkMap[l.Swap.BlockNumber] = blkMap[l.Swap.BlockNumber]
+		// TODO: handle one poolid has more than MaxReceipts case
+		// if len(logs) > circuit.MaxReceipts {
+		if poolCnt+1 <= circuit.MaxPoolNum && logCnt+len(logs) <= circuit.MaxReceipts {
+			// add to current
+			curProveReq.PoolIds = append(curProveReq.PoolIds, Hash2Hex(pid))
+			curProveReq.Logs = append(curProveReq.Logs, logs...)
+		} else {
+			// new req, add cur to ret first, then start a new one
+			proveReqs = append(proveReqs, curProveReq)
+			curProveReq = c.NewOneProveReq(sender, Hash2Hex(pid))
+			curProveReq.Logs = append(curProveReq.Logs, logs...)
+			poolCnt = 1
+			logCnt = len(logs)
 		}
-		proveReqs = append(proveReqs, &OneProveReq{
-			ChainId:    c.ChainID,
-			GasPerSwap: c.GasPerSwap,
-			PoolMgr:    c.PoolMgr,
-			Sender:     Addr2hex(sender),
-			Oracle:     c.Oracle,
-			PoolId:     Hash2Hex(pid),
-			Logs:       logs,
-			Blks:       subBlkMap,
-		})
 	}
-	return proveReqs
+	for _, p := range proveReqs {
+		p.Fix(blkMap)
+	}
+	return proveReqs, nil
+}
+
+func (c *OneChain) NewOneProveReq(sender common.Address, pools ...string) *OneProveReq {
+	return &OneProveReq{
+		ChainId:    c.ChainID,
+		GasPerSwap: c.GasPerSwap,
+		PoolMgr:    c.PoolMgr,
+		Sender:     Addr2hex(sender),
+		Oracle:     c.Oracle,
+		PoolIds:    pools,
+		Blks:       make(map[uint64]OneBlock),
+	}
 }
 
 func Hex2addr(addr string) common.Address {
