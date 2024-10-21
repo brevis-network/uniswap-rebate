@@ -1,6 +1,8 @@
 # uniswap-rebate
 This is NOT a uniswap v4 hook, but to give fee rebate to pools w/ non-zero hooks address.
 
+## v2 supports multiple pools in one app proof and use single proof onchain
+
 ## Use case
 Other projects deploy router contracts and interact with uniswap poolmanager. Uniswap will rebate gas fees in UNI if swap pool has hooks. Projects need to initiate claim flow and it's up to them how to distribute to actual users. Uniswap may have an internal implementation based on centralized signature. Brevis will provide a zk-based solution
 

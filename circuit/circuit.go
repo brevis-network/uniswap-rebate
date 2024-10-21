@@ -2,12 +2,17 @@ package circuit
 
 import (
 	"encoding/hex"
+	"math"
 
 	"github.com/brevis-network/brevis-sdk/sdk"
 )
 
 const (
-	MaxReceipts = 32
+	MaxReceipts = 2048
+	MaxPoolNum  = 4
+
+	// needed to compare min blknum
+	maxU64 uint64 = math.MaxUint64
 )
 
 var (
@@ -18,12 +23,12 @@ type GasCircuit struct {
 	PoolMgr sdk.Uint248 // PoolManager addr
 	Sender  sdk.Uint248 // msg.sender of swaps
 	Oracle  sdk.Uint248 // price oracle addr, ratio at slot0, value is ratio*10^18. note this is uni to eth ratio so we divide it to convert eth to uni
-	PoolId  sdk.Bytes32
+	PoolId  [MaxPoolNum]sdk.Bytes32
 	// gas amount of one swap event
 	GasPerSwap sdk.Uint248
 }
 
-// 1 receipt corresponds to 1 slot
+// duplicated slots will be empty/dummy
 func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 	return MaxReceipts, MaxReceipts, 0
 }
@@ -36,7 +41,7 @@ func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	api.AssertInputsAreUnique()
 	receipts := sdk.NewDataStream(api, in.Receipts)
-	// for each receipt, make sure it's from expected pool and msg.sender
+	// for each receipt, make sure it's from expected msg.sender
 	sdk.AssertEach(receipts, func(r sdk.Receipt) sdk.Uint248 {
 		swapLog := r.Fields[0]
 		swapLog2 := r.Fields[1]
@@ -45,23 +50,27 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 			api.Uint248.IsEqual(swapLog2.Contract, c.PoolMgr),
 			api.Uint248.IsEqual(swapLog.EventID, EventIdSwap),
 			api.Uint248.IsEqual(swapLog2.EventID, EventIdSwap),
-			api.Bytes32.IsEqual(swapLog.Value, c.PoolId),
 			api.Uint248.IsEqual(api.ToUint248(swapLog2.Value), c.Sender),
 		)
 	})
 
-	blockNums := sdk.Map(receipts, func(cur sdk.Receipt) sdk.Uint248 { return api.ToUint248(cur.BlockNum) })
-	minBlockNum := sdk.Min(blockNums)
-	maxBlockNum := sdk.Max(blockNums)
+	// per pool min/max blknum and totalUni
+	minBlk := [MaxPoolNum]sdk.Uint248{}
+	maxBlk := [MaxPoolNum]sdk.Uint248{}
+	totalUni := [MaxPoolNum]sdk.Uint248{}
+	for i := 0; i < MaxPoolNum; i++ {
+		minBlk[i] = sdk.ConstUint248(maxU64)
+		maxBlk[i] = sdk.ConstUint248(0)
+		totalUni[i] = sdk.ConstUint248(0)
+	}
 
 	// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
-	totalUni := sdk.ConstUint248(0)
-	lastRatio := sdk.ConstUint248(0)
+	lastRatio := sdk.ConstUint248(0) // save last slot for same block
 	for i := 0; i < len(in.Receipts.Raw); i++ {
 		r := in.Receipts.Raw[i]
 		eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
 		slot := in.StorageSlots.Raw[i]
-		// if slot blocknum isn't 0, receipt blocknum shoould equal slot blocknum
+		// if slot blocknum isn't 0, receipt blocknum should equal slot blocknum
 		api.Uint32.AssertIsEqual(r.BlockNum, api.Uint32.Select(
 			api.Uint32.IsZero(slot.BlockNum),
 			r.BlockNum,
@@ -76,15 +85,44 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
 		eth = api.Uint248.Mul(eth, sdk.ConstUint248(1e18))
 		uni, _ := api.Uint248.Div(eth, lastRatio)
-		totalUni = api.Uint248.Add(totalUni, uni)
+		rblk := api.ToUint248(r.BlockNum)
+		rpoolid := r.Fields[0].Value
+		// find match pool
+		for i := 0; i < MaxPoolNum; i++ {
+			// if poolid match, add uni to total, otherwise keep as is
+			totalUni[i] = api.Uint248.Select(
+				api.Bytes32.IsEqual(rpoolid, c.PoolId[i]),
+				api.Uint248.Add(totalUni[i], uni),
+				totalUni[i],
+			)
+			// if poolid match, compare minBlk and maxBlk
+			minBlk[i] = api.Uint248.Select(
+				api.Bytes32.IsEqual(rpoolid, c.PoolId[i]),
+				api.Uint248.Select(
+					api.Uint248.IsLessThan(rblk, minBlk[i]),
+					rblk,
+					minBlk[i],
+				),
+				minBlk[i],
+			)
+			maxBlk[i] = api.Uint248.Select(
+				api.Bytes32.IsEqual(rpoolid, c.PoolId[i]),
+				api.Uint248.Select(
+					api.Uint248.IsGreaterThan(rblk, maxBlk[i]),
+					rblk,
+					maxBlk[i],
+				),
+				maxBlk[i],
+			)
+		}
 	}
-
 	api.OutputAddress(c.Sender)
-	api.OutputBytes32(c.PoolId)
-	api.OutputUint(64, minBlockNum)
-	api.OutputUint(64, maxBlockNum)
-	api.OutputUint(128, totalUni)
-
+	for i := 0; i < MaxPoolNum; i++ {
+		api.OutputBytes32(c.PoolId[i])
+		api.OutputUint(64, minBlk[i])
+		api.OutputUint(64, maxBlk[i])
+		api.OutputUint(128, totalUni[i])
+	}
 	return nil
 }
 
