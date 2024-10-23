@@ -1,6 +1,8 @@
 db = "localhost:26257"
 grpcport = 9001
 httpport = 9002
+# send prove reqs to prove server which generates app proof then submit to brv gateway
+provesvr = "localhost:8889"
 
 [[multichain]]
 chainID = 97
@@ -9,7 +11,7 @@ gateway = "https://bsc-testnet-rpc.publicnode.com"
 BlkInterval = 5
 BlkDelay = 1
 
-GasPerSwap = 50000
+GasPerSwap = 80000
 PoolMgr = ""
 Oracle = ""
 VkHash = ""

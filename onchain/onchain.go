@@ -226,28 +226,16 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt) ([]*OneProveReq, e
 	// OneProveReq supports up to MaxReceipts and MaxPoolNum
 	// so we need to split into multiple requests if logByPool has more
 	// use simple algo for now
-
 	var proveReqs []*OneProveReq
-	var poolCnt, logCnt int // pool and log in this batch
-	curProveReq := c.NewOneProveReq(sender)
-	for pid, logs := range logByPool {
-		// TODO: handle one poolid has more than MaxReceipts case
-		// if len(logs) > circuit.MaxReceipts {
-		if poolCnt+1 <= circuit.MaxPoolNum && logCnt+len(logs) <= circuit.MaxReceipts {
-			// add to current
-			curProveReq.PoolIds = append(curProveReq.PoolIds, Hash2Hex(pid))
-			curProveReq.Logs = append(curProveReq.Logs, logs...)
-		} else {
-			// new req, add cur to ret first, then start a new one
-			proveReqs = append(proveReqs, curProveReq)
-			curProveReq = c.NewOneProveReq(sender, Hash2Hex(pid))
-			curProveReq.Logs = append(curProveReq.Logs, logs...)
-			poolCnt = 1
-			logCnt = len(logs)
+	for _, b := range SplitMapIntoBatches(logByPool, circuit.MaxPoolNum, circuit.MaxReceipts) {
+		// one b has up to limit pools and logs
+		req := c.NewOneProveReq(sender)
+		for k, v := range b {
+			req.PoolIds = append(req.PoolIds, Hash2Hex(k))
+			req.Logs = append(req.Logs, v...)
 		}
-	}
-	for _, p := range proveReqs {
-		p.Fix(blkMap)
+		req.Fix(blkMap)
+		proveReqs = append(proveReqs, req)
 	}
 	return proveReqs, nil
 }

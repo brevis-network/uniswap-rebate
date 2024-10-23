@@ -50,12 +50,15 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 		ret.Errmsg = "ProcessReceipts err: " + err.Error()
 		return
 	}
-
-	if len(prvR) > 0 {
-		fname = fmt.Sprintf("%s/%d-proveReqs.json", *fdir, reqid)
-		raw, _ := json.Marshal(prvR)
-		os.WriteFile(fname, raw, os.ModePerm)
+	if len(prvR) == 0 {
+		ret.Errmsg = "ProcessReceipts returns 0 requests"
+		return
 	}
+
+	fname = fmt.Sprintf("%s/%d-proveReqs.json", *fdir, reqid)
+	raw, _ = json.Marshal(prvR)
+	os.WriteFile(fname, raw, os.ModePerm)
+
 	// submit to app prover
 
 	// save req to db
