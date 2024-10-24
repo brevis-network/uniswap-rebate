@@ -42,7 +42,7 @@ var proveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// takes minutes to load
 		var err error
-		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(outDir, circuit.MaxReceipts, circuit.MaxReceipts, circuit.MaxReceipts*2)
+		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(outDir, circuit.MaxReceipts, circuit.MaxReceipts, sdk.NumMaxDataPoints)
 		chkErr(err, "ReadSetupFrom "+outDir)
 		vkhash, err := sdk.ComputeVkHash(vk)
 		chkErr(err, "ComputeVkHash")
