@@ -161,9 +161,9 @@ func DoOneReq(r *onchain.OneProveReq, batchIdx int) (*gwproto.Query, error) {
 	proof.WriteTo(&b)
 	proofStr := hex.EncodeToString(b.Bytes())
 	return &gwproto.Query{
-		AppCircuitInfo: buildAppCircuitInfo(circuitInput, vkHashStr, proofStr, ""),
-		ReceiptInfos:   buildReceiptInfos(receipts),
-		// StorageQueryInfos: ,
+		AppCircuitInfo:    buildAppCircuitInfo(circuitInput, vkHashStr, proofStr, ""),
+		ReceiptInfos:      buildReceiptInfos(receipts),
+		StorageQueryInfos: buildStorageInfos(r.Blks, r.Oracle, onchain.Hash2Hex(onchain.ZeroHash)),
 	}, nil
 }
 
@@ -197,6 +197,17 @@ func OneLog2SdkReceipt(l onchain.OneLog, basefee uint64) sdk.ReceiptData {
 func TxIdx2MptPath(txidx uint) *big.Int {
 	var b []byte
 	return new(big.Int).SetBytes(rlp.AppendUint64(b, uint64(txidx)))
+}
+
+func buildStorageInfos(m map[uint64]onchain.OneBlock, addr string, slot ...string) (infos []*gwproto.StorageQueryInfo) {
+	for blknum := range m {
+		infos = append(infos, &gwproto.StorageQueryInfo{
+			Account:     addr,
+			StorageKeys: slot,
+			BlkNum:      blknum,
+		})
+	}
+	return
 }
 
 func buildReceiptInfos(r []*sdk.ReceiptData) (infos []*gwproto.ReceiptInfo) {
