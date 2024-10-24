@@ -8,6 +8,7 @@ import (
 	"sort"
 	"time"
 
+	"github.com/brevis-network/brevis-sdk/sdk"
 	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/dal"
@@ -56,6 +57,9 @@ type OneProveReq struct {
 	Logs []OneLog
 	// blknum -> info about at this block, include all blocknums from Logs
 	Blks map[uint64]OneBlock
+
+	// set by server
+	ReqId int64
 }
 
 // sort logs and populate Blks from m
@@ -67,6 +71,19 @@ func (r *OneProveReq) Fix(m map[uint64]OneBlock) {
 		// ok to set again as it's same anyway
 		r.Blks[l.Swap.BlockNumber] = m[l.Swap.BlockNumber]
 	}
+}
+
+func (r *OneProveReq) NewCircuit() *circuit.GasCircuit {
+	ret := &circuit.GasCircuit{
+		PoolMgr:    sdk.ConstUint248(Hex2Bytes(r.PoolMgr)),
+		Sender:     sdk.ConstUint248(Hex2Bytes(r.Sender)),
+		Oracle:     sdk.ConstUint248(Hex2Bytes(r.Oracle)),
+		GasPerSwap: sdk.ConstUint248(r.GasPerSwap),
+	}
+	for i, pid := range r.PoolIds {
+		ret.PoolId[i] = sdk.ConstBytes32(Hex2Bytes(pid))
+	}
+	return ret
 }
 
 // return err if dial fail or chainid mismatch
@@ -267,4 +284,17 @@ func Hex2hash(hexstr string) common.Hash {
 
 func Hash2Hex(h [32]byte) string {
 	return "0x" + hex.EncodeToString(h[:])
+}
+
+// ===== utils =====
+func Hex2Bytes(s string) (b []byte) {
+	if len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
+		s = s[2:]
+	}
+	// hex.DecodeString expects an even-length string
+	if len(s)%2 == 1 {
+		s = "0" + s
+	}
+	b, _ = hex.DecodeString(s)
+	return b
 }

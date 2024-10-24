@@ -17,6 +17,7 @@ const (
 
 var (
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
+	zeroB32     = sdk.ConstBytes32([]byte{0})
 )
 
 type GasCircuit struct {
@@ -124,6 +125,19 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		api.OutputUint(128, totalUni[i])
 	}
 	return nil
+}
+
+func DefaultCircuit() *GasCircuit {
+	ret := &GasCircuit{
+		PoolMgr:    sdk.ConstUint248(0),
+		Sender:     sdk.ConstUint248(0),
+		Oracle:     sdk.ConstUint248(0),
+		GasPerSwap: sdk.ConstUint248(0),
+	}
+	for i := 0; i < MaxPoolNum; i++ {
+		ret.PoolId[i] = zeroB32
+	}
+	return ret
 }
 
 // ===== utils =====

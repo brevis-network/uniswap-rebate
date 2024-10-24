@@ -18,10 +18,6 @@ const (
 	SwapEvId = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
 )
 
-var (
-	zeroB32 = sdk.ConstBytes32([]byte{0})
-)
-
 func TestCircuit(t *testing.T) {
 	app, _ := sdk.NewBrevisApp(1)
 	// ========== receipts
@@ -101,19 +97,6 @@ func newLog(logIdx, fieldIdx uint, value string) sdk.LogFieldData {
 		FieldIndex: fieldIdx,
 		Value:      common.HexToHash(value),
 	}
-}
-
-func DefaultCircuit() *GasCircuit {
-	ret := &GasCircuit{
-		PoolMgr:    sdk.ConstUint248(0),
-		Sender:     sdk.ConstUint248(0),
-		Oracle:     sdk.ConstUint248(0),
-		GasPerSwap: sdk.ConstUint248(0),
-	}
-	for i := 0; i < MaxPoolNum; i++ {
-		ret.PoolId[i] = zeroB32
-	}
-	return ret
 }
 
 func NewCircuit() *GasCircuit {

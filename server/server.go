@@ -1,16 +1,20 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"os"
 	"strings"
 	"time"
 
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/brevis-network/uniswap-rebate/webapi"
+	"github.com/spf13/viper"
 )
 
 type Server struct {
@@ -54,12 +58,23 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 		ret.Errmsg = "ProcessReceipts returns 0 requests"
 		return
 	}
+	for _, r := range prvR {
+		r.ReqId = reqid
+	}
 
 	fname = fmt.Sprintf("%s/%d-proveReqs.json", *fdir, reqid)
 	raw, _ = json.Marshal(prvR)
 	os.WriteFile(fname, raw, os.ModePerm)
 
 	// submit to app prover
+	resp, err := http.Post(viper.GetString("prover")+"/prove", "application/json", bytes.NewBuffer(raw))
+	if err != nil {
+		ret.Errmsg = "post to prover err: " + err.Error()
+		return
+	}
+	defer resp.Body.Close()
+	respR, _ := io.ReadAll(resp.Body)
+	log.Println(resp.StatusCode, string(respR))
 
 	// save req to db
 	err = s.db.ReqAdd(context.Background(), dal.ReqAddParams{

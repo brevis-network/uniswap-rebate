@@ -6,9 +6,11 @@ package cmd
 import (
 	"encoding/json"
 	"fmt"
+	"math/big"
 	"net/http"
 
 	"github.com/brevis-network/brevis-sdk/sdk"
+	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
 	"github.com/brevis-network/uniswap-rebate/onchain"
 	"github.com/celer-network/goutils/log"
 	"github.com/consensys/gnark/backend/plonk"
@@ -19,7 +21,7 @@ import (
 
 // flags
 var (
-	outDir, brvGw string
+	brvGw string
 	// accept req on this port
 	lport int
 )
@@ -59,14 +61,47 @@ func HandleProve(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 		http.Error(w, "bad request: "+err.Error(), http.StatusBadRequest)
 		return
 	}
-	log.Infoln("provereqs:", len(req))
-	// go ProveReq(&req)
+	go ProveReqs(req)
 	fmt.Fprint(w, "OK\n")
+}
+
+func ProveReqs(reqs []*onchain.OneProveReq) {
+	for _, r := range reqs {
+		query, err := DoOne(r)
+
+	}
+}
+
+func DoOne(r *onchain.OneProveReq) (*gwproto.Query, error) {
+	log.Infoln("req", r.ReqId, "pools:", r.PoolIds)
+
+	app, _ := sdk.NewBrevisApp(r.ChainId, brvGw)
+	// var receipts []*sdk.ReceiptData
+	var lastBlockNum uint64
+	for i, onelog := range r.Logs {
+		blkNum := onelog.Swap.BlockNumber
+		block := r.Blks[blkNum]
+		if blkNum != lastBlockNum {
+			app.AddStorage(sdk.StorageData{
+				BlockNum:     new(big.Int).SetUint64(blkNum),
+				BlockBaseFee: new(big.Int).SetUint64(block.BaseFee),
+				Address:      onchain.Hex2addr(r.Oracle),
+				Slot:         onchain.ZeroHash,
+				Value:        block.SlotValue,
+			}, i) // special mode, sdk will fill dummy in between
+		}
+		// app.AddReceipt()
+	}
+	c := r.NewCircuit()
+	circuitInput, err := app.BuildCircuitInput(c)
+	if err != nil {
+		return nil, fmt.Errorf("BuildCircuitInput %v", err)
+	}
 }
 
 func init() {
 	rootCmd.AddCommand(proveCmd)
-	proveCmd.PersistentFlags().StringVar(&outDir, "outDir", "$HOME/circuitOut/viphookalg", "folder for circuit in/output")
+	proveCmd.PersistentFlags().StringVar(&outDir, "outDir", "$HOME/circuitOut/unigasrebate", "folder for circuit in/output")
 	proveCmd.PersistentFlags().StringVar(&brvGw, "brvgw", "", "brevis gateway grpc endpoint")
 	proveCmd.PersistentFlags().IntVar(&lport, "port", 8889, "listen port for prove request")
 }
