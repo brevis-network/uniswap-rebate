@@ -91,7 +91,7 @@ var (
 func newLog(logIdx, fieldIdx uint, value string) sdk.LogFieldData {
 	return sdk.LogFieldData{
 		Contract:   ContractAddr,
-		LogIndex:   logIdx,
+		LogPos:     logIdx,
 		EventID:    EventId,
 		IsTopic:    true,
 		FieldIndex: fieldIdx,

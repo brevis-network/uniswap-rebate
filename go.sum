@@ -16,8 +16,10 @@ github.com/bits-and-blooms/bitset v1.10.0 h1:ePXTeiPEazB5+opbv5fr8umg2R/1NlzgDsy
 github.com/bits-and-blooms/bitset v1.10.0/go.mod h1:7hO7Gc7Pp1vODcmWvKMRA9BNmbv6a/7QIWpPxHddWR8=
 github.com/blang/semver/v4 v4.0.0 h1:1PFHFE6yCCTv8C1TeyNNarDzntLi7wMI5i/pzqYIsAM=
 github.com/blang/semver/v4 v4.0.0/go.mod h1:IbckMUScFkM3pff0VJDNKRiT6TG/YpiHIM2yvyW5YoQ=
-github.com/brevis-network/brevis-sdk v0.0.0-20241008133620-27c0199f5d74 h1:s45oxSgFo6IRp/2MJuEQXP+I/cHoVmn5krgMkJmIKp0=
-github.com/brevis-network/brevis-sdk v0.0.0-20241008133620-27c0199f5d74/go.mod h1:mgpkZ06CL9GPoeMr8wPTaT+t8mLRp9AwLLtDKv5vI0g=
+github.com/brevis-network/brevis-sdk v0.3.2 h1:YM94JX+49bE5y9msz4SRKpB+hiwTdbOooh6YmoO1Q4g=
+github.com/brevis-network/brevis-sdk v0.3.2/go.mod h1:62wE+395Sb3LHAa9YyrQroIHiQmkAmLQ8O7gJvPBHQY=
+github.com/brevis-network/poseidon-goldilocks-go v0.0.0-20240826082508-8017eb90f413 h1:Q1+JagFYZ/atuJejVOfxBSeYGqeVkRVWXqaGu03HmUQ=
+github.com/brevis-network/poseidon-goldilocks-go v0.0.0-20240826082508-8017eb90f413/go.mod h1:sGddb8GeVcQErqlTrfUIP/2SmIzpG7DmPsFy3tBY9KQ=
 github.com/brevis-network/zk-hash v0.0.0-20240903111749-fedffbe8a45c h1:+tXzO1P9S0FT4uQ7kw3xSe0BpxnOH+VazNxQstX0qXI=
 github.com/brevis-network/zk-hash v0.0.0-20240903111749-fedffbe8a45c/go.mod h1:fMfTUW6bGRcOk8Vm0c82Ob8uEWysWsev9d4mn609skg=
 github.com/brevis-network/zk-utils v0.0.0-20240916014259-e0a7a7e4fcda h1:+IpTDojk3mCE811iIC4v/ecyIYfbG8X1sltgTDrXY3o=
@@ -58,8 +60,7 @@ github.com/consensys/bavard v0.1.13/go.mod h1:9ItSMtA/dXMAiL7BG6bqW2m3NdSEObYWoH
 github.com/consensys/gnark-crypto v0.12.2-0.20240215234832-d72fcb379d3e h1:MKdOuCiy2DAX1tMp2YsmtNDaqdigpY6B5cZQDJ9BvEo=
 github.com/consensys/gnark-crypto v0.12.2-0.20240215234832-d72fcb379d3e/go.mod h1:wKqwsieaKPThcFkHe0d0zMsbHEUWFmZcG7KBCse210o=
 github.com/coreos/go-systemd/v22 v22.5.0/go.mod h1:Y58oyj3AT4RCenI/lSvhwexgC+NSVTIJ3seZv2GcEnc=
-github.com/cpuguy83/go-md2man/v2 v2.0.2 h1:p1EgwI/C7NhT0JmVkwCD2ZBK8j4aeHQX2pMHHBfMQ6w=
-github.com/cpuguy83/go-md2man/v2 v2.0.2/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
+github.com/cpuguy83/go-md2man/v2 v2.0.4 h1:wfIWP927BUkWJb2NmU/kNDYIBTh/ziUX91+lVfRxZq4=
 github.com/cpuguy83/go-md2man/v2 v2.0.4/go.mod h1:tgQtvFlXSQOSOSIRvRPT7W67SCa46tRHOmNcaadrF8o=
 github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c h1:uQYC5Z1mdLRPrZhHjHxufI8+2UG/i25QG92j0Er9p6I=
 github.com/crate-crypto/go-ipa v0.0.0-20240223125850-b1e8a79f509c/go.mod h1:geZJZH3SzKCqnz5VT0q/DyIG/tvu/dZk+VIfXicupJs=

@@ -11,6 +11,7 @@ import (
 
 	"github.com/brevis-network/brevis-sdk/sdk"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
+	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/onchain"
 	"github.com/celer-network/goutils/log"
 	"github.com/consensys/gnark/backend/plonk"
@@ -29,7 +30,8 @@ var (
 	compiledCircuit constraint.ConstraintSystem
 	pk              plonk.ProvingKey
 	vk              plonk.VerifyingKey
-	vkHashStr       string // will set after read vk
+	vkHashStr       string
+	vkHash          []byte
 )
 
 // proveCmd represents the prove command
@@ -40,7 +42,7 @@ var proveCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		// takes minutes to load
 		var err error
-		compiledCircuit, pk, vk, err = sdk.ReadSetupFrom(outDir)
+		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(outDir, circuit.MaxReceipts, circuit.MaxReceipts, circuit.MaxReceipts*2)
 		chkErr(err, "ReadSetupFrom "+outDir)
 		vkhash, err := sdk.ComputeVkHash(vk)
 		chkErr(err, "ComputeVkHash")
@@ -67,7 +69,8 @@ func HandleProve(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 func ProveReqs(reqs []*onchain.OneProveReq) {
 	for _, r := range reqs {
-		query, err := DoOne(r)
+		DoOne(r)
+		// query, err := DoOne(r)
 
 	}
 }
@@ -93,10 +96,11 @@ func DoOne(r *onchain.OneProveReq) (*gwproto.Query, error) {
 		// app.AddReceipt()
 	}
 	c := r.NewCircuit()
-	circuitInput, err := app.BuildCircuitInput(c)
+	_, err := app.BuildCircuitInput(c)
 	if err != nil {
 		return nil, fmt.Errorf("BuildCircuitInput %v", err)
 	}
+	return nil, nil
 }
 
 func init() {

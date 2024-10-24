@@ -3,17 +3,19 @@ module github.com/brevis-network/uniswap-rebate
 go 1.21.8
 
 require (
-	github.com/brevis-network/brevis-sdk v0.0.0-20241008133620-27c0199f5d74
+	github.com/brevis-network/brevis-sdk v0.3.2
 	github.com/cockroachdb/cockroach-go/v2 v2.3.8
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0
 	github.com/lib/pq v1.10.6
+	github.com/spf13/cobra v1.8.1
 	google.golang.org/genproto/googleapis/api v0.0.0-20240814211410-ddb44dafa142
 	google.golang.org/grpc v1.64.1
 	google.golang.org/protobuf v1.34.2
 )
 
 require (
+	github.com/OpenAssetStandards/poseidon-goldilocks-go v0.0.0 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/magiconair/properties v1.8.7 // indirect
@@ -24,7 +26,6 @@ require (
 	github.com/sourcegraph/conc v0.3.0 // indirect
 	github.com/spf13/afero v1.11.0 // indirect
 	github.com/spf13/cast v1.6.0 // indirect
-	github.com/spf13/cobra v1.8.1 // indirect
 	github.com/spf13/pflag v1.0.5 // indirect
 	github.com/subosito/gotenv v1.6.0 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
@@ -45,7 +46,7 @@ require (
 	github.com/cbergoon/merkletree v0.2.0 // indirect
 	github.com/celer-network/goutils v0.2.0
 	github.com/consensys/bavard v0.1.13 // indirect
-	github.com/consensys/gnark v0.10.0 // indirect
+	github.com/consensys/gnark v0.10.0
 	github.com/consensys/gnark-crypto v0.12.2-0.20240215234832-d72fcb379d3e // indirect
 	github.com/crate-crypto/go-kzg-4844 v1.0.0 // indirect
 	github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc // indirect
@@ -93,4 +94,7 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-replace github.com/consensys/gnark => github.com/celer-network/gnark v0.1.0
+replace (
+	github.com/OpenAssetStandards/poseidon-goldilocks-go => github.com/brevis-network/poseidon-goldilocks-go v0.0.0-20240826082508-8017eb90f413
+	github.com/consensys/gnark => github.com/celer-network/gnark v0.1.0
+)
