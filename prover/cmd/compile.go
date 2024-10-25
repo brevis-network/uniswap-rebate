@@ -21,7 +21,7 @@ var compileCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		appCircuit := circuit.DefaultCircuit()
 
-		_, _, _, vkhash, err := sdk.Compile(appCircuit, outDir, srsDir, circuit.MaxReceipts, circuit.MaxReceipts, sdk.NumMaxDataPoints)
+		_, _, _, vkhash, err := sdk.Compile(appCircuit, outDir, srsDir)
 		if err != nil {
 			log.Error("sdk.Compile err:", err)
 		}

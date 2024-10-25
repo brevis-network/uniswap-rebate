@@ -8,6 +8,7 @@ import (
 	"github.com/brevis-network/brevis-sdk/test"
 
 	"github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/rlp"
 )
 
 const (
@@ -26,6 +27,7 @@ func TestCircuit(t *testing.T) {
 		sdk.ReceiptData{
 			BlockNum:     big.NewInt(1),
 			BlockBaseFee: big.NewInt(1e9),
+			MptKeyPath:   TxIdx2MptPath(10),
 			Fields: [4]sdk.LogFieldData{
 				newLog(1, 1, PoolId),
 				newLog(1, 2, Sender),
@@ -36,6 +38,7 @@ func TestCircuit(t *testing.T) {
 		sdk.ReceiptData{
 			BlockNum:     big.NewInt(1),
 			BlockBaseFee: big.NewInt(1e9),
+			MptKeyPath:   TxIdx2MptPath(10),
 			Fields: [4]sdk.LogFieldData{
 				newLog(2, 1, PoolId),
 				newLog(2, 2, Sender),
@@ -46,6 +49,7 @@ func TestCircuit(t *testing.T) {
 		sdk.ReceiptData{
 			BlockNum:     big.NewInt(2),
 			BlockBaseFee: big.NewInt(2e9),
+			MptKeyPath:   TxIdx2MptPath(10),
 			Fields: [4]sdk.LogFieldData{
 				newLog(1, 1, PoolId),
 				newLog(1, 2, Sender),
@@ -117,4 +121,9 @@ func check(err error) {
 	if err != nil {
 		panic(err)
 	}
+}
+
+func TxIdx2MptPath(txidx uint) *big.Int {
+	var b []byte
+	return new(big.Int).SetBytes(rlp.AppendUint64(b, uint64(txidx)))
 }

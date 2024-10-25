@@ -53,9 +53,11 @@ var proveCmd = &cobra.Command{
 	Short: "accept prove req, send to Brevis",
 
 	Run: func(cmd *cobra.Command, args []string) {
+		appCircuit := circuit.DefaultCircuit()
+
 		// takes minutes to load
 		var err error
-		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(outDir, circuit.MaxReceipts, circuit.MaxReceipts, sdk.NumMaxDataPoints)
+		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(appCircuit, outDir)
 		chkErr(err, "ReadSetupFrom "+outDir)
 		vkhash, err := sdk.ComputeVkHash(vk)
 		chkErr(err, "ComputeVkHash")
