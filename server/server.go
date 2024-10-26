@@ -49,7 +49,7 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 	}
 
 	// check logs in receipts and prepare proof etc
-	prvR, err := onec.ProcessReceipts(receipts)
+	prvR, err := onec.ProcessReceipts(receipts, req.PoolIds)
 	if err != nil {
 		ret.Errmsg = "ProcessReceipts err: " + err.Error()
 		return

@@ -25,6 +25,7 @@ message NewProofReq {
     uint64 chain_id = 1;
     uint64 campaign_id = 2; // will be ignored as zk doesn't support campaign
     string txn_hashes = 3;
+    repeated string pool_ids = 4; // optional, if set, only prove for included pool_ids
 }
 
 message NewProofResp {

@@ -178,12 +178,28 @@ func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 
 // go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr)
 // fetch block basefee and storage, return ready to use start prove reqs
-func (c *OneChain) ProcessReceipts(receipts []*types.Receipt) ([]*OneProveReq, error) {
+func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string) ([]*OneProveReq, error) {
 	poolids, _ := c.db.PoolIds(context.Background())
+	// if onlyPids is empty, allow all eligible, otherwise, must be both in onlyPids and in db
 	poolidMap := make(map[[32]byte]bool)
-	for _, pid := range poolids {
-		poolidMap[Hex2hash(pid)] = true
+	if len(onlyPids) == 0 {
+		for _, pid := range poolids {
+			poolidMap[Hex2hash(pid)] = true
+		}
+	} else {
+		// intersection of onlyPids and poolids from db
+		onlyMap := make(map[[32]byte]bool)
+		for _, pid := range onlyPids {
+			onlyMap[Hex2hash(pid)] = true
+		}
+		for _, pid := range poolids {
+			pidh := Hex2hash(pid)
+			if onlyMap[pidh] {
+				poolidMap[pidh] = true
+			}
+		}
 	}
+
 	// poolid to list of entries
 	logByPool := make(map[[32]byte][]OneLog)
 	pmAddr := Hex2addr(c.PoolMgr)
