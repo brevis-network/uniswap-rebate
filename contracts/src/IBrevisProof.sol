@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.13;
-import "./Lib.sol";
+
 interface IBrevisProof {
+    struct ProofData {
+        bytes32 commitHash;
+        bytes32 vkHash;
+        bytes32 appCommitHash; // zk-program computing circuit commit hash
+        bytes32 appVkHash; // zk-program computing circuit Verify Key hash
+        bytes32 smtRoot;
+    }
     function submitProof(
         uint64 _chainId,
         bytes calldata _proofWithPubInputs
@@ -13,5 +20,5 @@ interface IBrevisProof {
         bytes calldata _proofWithPubInputs
     ) external;
 
-    function validateAggProofData(uint64 _chainId, Brevis.ProofData[] calldata _proofDataArray) external view;
+    function validateAggProofData(uint64 _chainId, ProofData[] calldata _proofDataArray) external view;
 }

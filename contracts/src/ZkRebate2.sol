@@ -5,7 +5,6 @@ import {PoolId} from "v4-core/types/PoolId.sol";
 import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
-import {Brevis} from "./Lib.sol";
 import {IBrevisProof} from "./IBrevisProof.sol";
 
 contract ZkRebate2 {
@@ -43,7 +42,7 @@ contract ZkRebate2 {
         bytes calldata _proof,
         bytes[] calldata _appCircuitOutputs,
         bytes32[] calldata _proofIds,
-        Brevis.ProofData[] calldata _proofDataArray
+        IBrevisProof.ProofData[] calldata _proofDataArray
     ) external {
         uint256 amount = 0; // total uni
         if (_appCircuitOutputs.length == 1 ) {
