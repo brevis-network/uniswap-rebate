@@ -1,10 +1,20 @@
 package binding
 
 import (
+	"database/sql/driver"
 	"encoding/hex"
+	"encoding/json"
 
 	"github.com/brevis-network/uniswap-rebate/webapi"
 )
+
+func (k PoolKey) Value() (driver.Value, error) {
+	return json.Marshal(k)
+}
+
+func (k *PoolKey) Scan(value interface{}) error {
+	return json.Unmarshal(value.([]byte), k)
+}
 
 // to be saved in db. fields are args for ClaimWithZkProofs
 type CallData struct {
