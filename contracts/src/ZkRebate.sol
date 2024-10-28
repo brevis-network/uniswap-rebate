@@ -7,15 +7,15 @@ import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {IBrevisProof} from "./IBrevisProof.sol";
 
-contract ZkRebate2 {
+contract ZkRebate {
     IERC20 public uni;
     IBrevisProof public brvProof;
     bytes32 public vkHash;
 
     // per addr, per poolid, last attested blocknum, new proof must have blocknum > lastBlockNum
-    mapping(address => mapping(bytes32 => uint64)) lastBlockNum;
+    mapping(address => mapping(bytes32 => uint64)) public lastBlockNum;
     // eligible pools, ie. poolkey.Hooks is non-zero.
-    mapping(bytes32 => bool) poolId;
+    mapping(bytes32 => bool) public poolId;
 
     constructor(IBrevisProof _brv, bytes32 _vkHash, IERC20 _uni) {
         brvProof = _brv;
@@ -51,28 +51,7 @@ contract ZkRebate2 {
             (, bytes32 appCommitHash, bytes32 appVkHash) = brvProof.submitProof(uint64(block.chainid), _proof);
             require(appVkHash == vkHash, "mismatch vkhash");
             require(appCommitHash == keccak256(_appOutput), "invalid circuit output");
-            require(_appOutput.length >= 84, "not enough app output");
-            require((_appOutput.length-20) % 64 == 0, "incorrect app output");
-        
-            // sender is msg.sender for Swap
-            address sender = address(bytes20(_appOutput[0:20]));
-            require(msg.sender==sender, "mismatch msg.sender and circuit output");
-
-            for (uint256 idx=20;idx<_appOutput.length;idx+=64) {
-                bytes32 poolid = bytes32(_appOutput[idx:idx+32]);
-                if(poolid == 0) {
-                    break; // circuit may have zero fillings due to fixed length, ends loop early to save gas
-                }
-                if(poolId[poolid]) {
-                    uint64 beginBlk = uint64(bytes8(_appOutput[idx+32:idx+40]));
-                    uint64 endBlk = uint64(bytes8(_appOutput[idx+40:idx+48]));
-                    if(beginBlk>lastBlockNum[sender][poolid]) {
-                        lastBlockNum[sender][poolid] = endBlk;
-                        amount += uint128(bytes16(_appOutput[68:84]));
-                    }
-                }
-            }
-            // emit event?
+            amount = handleOutput(_appOutput);
             if(amount > 0 ) {
                 uni.transfer(receiver, amount);
             }
@@ -86,27 +65,38 @@ contract ZkRebate2 {
             require(_proofDataArray[i].appVkHash == vkHash, "mismatch vkhash");
             require(_proofDataArray[i].commitHash == _proofIds[i], "invalid proofId");
             require(_proofDataArray[i].appCommitHash == keccak256(_appCircuitOutputs[i]), "invalid circuit output");
+            amount += handleOutput(_appCircuitOutputs[i]);
         }
+        if(amount > 0) {
+            uni.transfer(receiver, amount);
+        }
+    }
 
-        for (uint256 i=0;i<_appCircuitOutputs.length;i++) {
-            // one output has addr(20), [poolid(32), fromblk(8), toblk(8), uni amount(16)]
-            address sender = address(bytes20(_appCircuitOutputs[i][0:20]));
-            require(msg.sender==sender, "mismatch msg.sender and circuit output");
-            bytes calldata _appOutput = _appCircuitOutputs[i];
-            for (uint256 idx=20;idx<_appOutput.length;idx+=64) {
-                bytes32 poolid = bytes32(_appCircuitOutputs[i][20:52]);
-                if(poolId[poolid]) { // valid pool
-                    uint64 beginBlk = uint64(bytes8(_appCircuitOutputs[i][52:60]));
-                    uint64 endBlk = uint64(bytes8(_appCircuitOutputs[i][60:68]));
-                    if(beginBlk>lastBlockNum[sender][poolid]) {
-                        lastBlockNum[sender][poolid] = endBlk;
-                        amount += uint128(bytes16(_appCircuitOutputs[i][68:84]));
-                    }
+    // parse _appOutput, return total uni amount
+    // one output has addr(20), [poolid(32), fromblk(8), toblk(8), uni amount(16)]
+    function handleOutput(bytes calldata _appOutput) internal returns (uint256) {
+        uint256 amount = 0;
+        require(_appOutput.length >= 84, "not enough app output");
+        require((_appOutput.length-20) % 64 == 0, "incorrect app output");
+    
+        // sender is msg.sender for Swap
+        address sender = address(bytes20(_appOutput[0:20]));
+        require(msg.sender==sender, "mismatch msg.sender and circuit output");
+
+        for (uint256 idx=20;idx<_appOutput.length;idx+=64) {
+            bytes32 poolid = bytes32(_appOutput[idx:idx+32]);
+            if(poolid == 0) {
+                break; // circuit may have zero fillings due to fixed length, ends loop early to save gas
+            }
+            if(poolId[poolid]) {
+                uint64 beginBlk = uint64(bytes8(_appOutput[idx+32:idx+40]));
+                uint64 endBlk = uint64(bytes8(_appOutput[idx+40:idx+48]));
+                if(beginBlk>lastBlockNum[sender][poolid]) {
+                    lastBlockNum[sender][poolid] = endBlk;
+                    amount += uint128(bytes16(_appOutput[68:84]));
                 }
             }
         }
-        if(amount > 0 ) {
-            uni.transfer(receiver, amount);
-        }
+        return amount;
     }
 }

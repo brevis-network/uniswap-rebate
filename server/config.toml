@@ -5,13 +5,13 @@ httpport = 9002
 prover = "http://localhost:8889"
 
 [[multichain]]
-chainID = 97
-name = "BscTest"
-gateway = "https://bsc-testnet-rpc.publicnode.com"
-BlkInterval = 5
-BlkDelay = 1
+chainID = 11155111
+name = "Sepolia"
+gateway = "https://rpc.sepolia.dev"
+BlkInterval = 12
+BlkDelay = 2
 
 GasPerSwap = 80000
-PoolMgr = ""
-Oracle = ""
+PoolMgr = "0x8C4BcBE6b9eF47855f97E675296FA3F6fafa5F1A"
+Oracle = "0xc8caf3c1d76d264b6d5d511d883b58b3874eafa0"
 VkHash = ""

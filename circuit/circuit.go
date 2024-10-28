@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	MaxPerPool  = 256
-	MaxPoolNum  = 8
+	MaxPerPool  = 128
+	MaxPoolNum  = 2
 	MaxReceipts = MaxPerPool * MaxPoolNum
 
 	// needed to compare min blknum
@@ -41,6 +41,7 @@ func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 // only first corresponding slot has actual data, rests are dummy
 // receipts: b1r1, b1r2, b1r3, b2r1
 // slots: b1s1, 0, 0, b2s1
+// first MaxPerPool data is for poolid[0], etc.
 func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	api.AssertInputsAreUnique()
 	receipts := sdk.NewDataStream(api, in.Receipts)
@@ -67,48 +68,60 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		totalUni[i] = sdk.ConstUint248(0)
 	}
 	api.OutputAddress(c.Sender)
+	lastRatio := sdk.ConstUint248(0) // save last slot for same block
+	// note if lastRatio is per poolid segment, empty poolid will cause div by zero
 	// split input into segments
 	for poolidx := 0; poolidx < MaxPoolNum; poolidx++ {
 		// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
-		lastRatio := sdk.ConstUint248(0) // save last slot for same block
+
 		baseIdx := poolidx * MaxPerPool
 		// receipt and storage index
 		for i := baseIdx; i < MaxPerPool+baseIdx; i++ {
 			r := in.Receipts.Raw[i]
+			// if r.BlockNum is 0, consider data is a dummy so do nothing
+			isDummy := api.Uint32.IsZero(r.BlockNum)
 			// ensure poolid matches
-			api.Bytes32.AssertIsEqual(r.Fields[0].Value, c.PoolId[poolidx])
+			api.Bytes32.AssertIsEqual(c.PoolId[poolidx], api.Bytes32.Select(
+				api.ToUint248(isDummy),
+				c.PoolId[poolidx],
+				r.Fields[0].Value,
+			))
 
-			eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
 			slot := in.StorageSlots.Raw[i]
 			// if slot blocknum isn't 0, receipt blocknum should equal slot blocknum
 			api.Uint32.AssertIsEqual(r.BlockNum, api.Uint32.Select(
-				api.Uint32.IsZero(slot.BlockNum),
+				api.Uint32.Or(isDummy, api.Uint32.IsZero(slot.BlockNum)),
 				r.BlockNum,
 				slot.BlockNum,
 			))
 			// if slot.BlockNum is 0, use last ratio
 			lastRatio = api.Uint248.Select(
-				api.Uint248.IsZero(sdk.Uint248(slot.BlockNum)),
+				api.Uint248.Or(api.ToUint248(isDummy), api.Uint248.IsZero(api.ToUint248(slot.BlockNum))),
 				lastRatio,
 				api.ToUint248(slot.Value),
 			)
+			eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
 			// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
 			eth = api.Uint248.Mul(eth, sdk.ConstUint248(1e18))
 			uni, _ := api.Uint248.Div(eth, lastRatio)
 			totalUni[poolidx] = api.Uint248.Add(totalUni[poolidx], uni)
+			// possible: receipt[0] for min, last valid receipt for max?
 			minBlk[poolidx] = api.Uint32.Select(
-				api.Uint32.IsLessThan(r.BlockNum, minBlk[poolidx]),
+				// not dummy, and receipt has smaller blocknum
+				api.Uint32.And(api.Uint32.Not(isDummy), api.Uint32.IsLessThan(r.BlockNum, minBlk[poolidx])),
 				r.BlockNum,
 				minBlk[poolidx],
 			)
 			maxBlk[poolidx] = api.Uint32.Select(
-				api.Uint32.IsGreaterThan(r.BlockNum, maxBlk[poolidx]),
+				api.Uint32.And(api.Uint32.Not(isDummy), api.Uint32.IsGreaterThan(r.BlockNum, maxBlk[poolidx])),
 				r.BlockNum,
 				maxBlk[poolidx],
 			)
 		}
 		api.OutputBytes32(c.PoolId[poolidx])
+		api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
 		api.OutputUint32(32, minBlk[poolidx])
+		api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
 		api.OutputUint32(32, maxBlk[poolidx])
 		api.OutputUint(128, totalUni[poolidx])
 	}
