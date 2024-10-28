@@ -8,11 +8,13 @@ import (
 )
 
 const (
-	MaxReceipts = 2048
-	MaxPoolNum  = 4
+	MaxPerPool  = 256
+	MaxPoolNum  = 8
+	MaxReceipts = MaxPerPool * MaxPoolNum
 
 	// needed to compare min blknum
-	maxU64 uint64 = math.MaxUint64
+	// maxU64 uint64 = math.MaxUint64
+	maxU32 uint32 = math.MaxUint32
 )
 
 var (
@@ -56,73 +58,59 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	})
 
 	// per pool min/max blknum and totalUni
-	minBlk := [MaxPoolNum]sdk.Uint248{}
-	maxBlk := [MaxPoolNum]sdk.Uint248{}
+	minBlk := [MaxPoolNum]sdk.Uint32{}
+	maxBlk := [MaxPoolNum]sdk.Uint32{}
 	totalUni := [MaxPoolNum]sdk.Uint248{}
 	for i := 0; i < MaxPoolNum; i++ {
-		minBlk[i] = sdk.ConstUint248(maxU64)
-		maxBlk[i] = sdk.ConstUint248(0)
+		minBlk[i] = sdk.ConstUint32(maxU32)
+		maxBlk[i] = sdk.ConstUint32(0)
 		totalUni[i] = sdk.ConstUint248(0)
 	}
+	api.OutputAddress(c.Sender)
+	// split input into segments
+	for poolidx := 0; poolidx < MaxPoolNum; poolidx++ {
+		// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
+		lastRatio := sdk.ConstUint248(0) // save last slot for same block
+		baseIdx := poolidx * MaxPerPool
+		// receipt and storage index
+		for i := baseIdx; i < MaxPerPool+baseIdx; i++ {
+			r := in.Receipts.Raw[i]
+			// ensure poolid matches
+			api.Bytes32.AssertIsEqual(r.Fields[0].Value, c.PoolId[poolidx])
 
-	// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
-	lastRatio := sdk.ConstUint248(0) // save last slot for same block
-	for i := 0; i < len(in.Receipts.Raw); i++ {
-		r := in.Receipts.Raw[i]
-		eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
-		slot := in.StorageSlots.Raw[i]
-		// if slot blocknum isn't 0, receipt blocknum should equal slot blocknum
-		api.Uint32.AssertIsEqual(r.BlockNum, api.Uint32.Select(
-			api.Uint32.IsZero(slot.BlockNum),
-			r.BlockNum,
-			slot.BlockNum,
-		))
-		// if slot.BlockNum is 0, use last ratio
-		lastRatio = api.Uint248.Select(
-			api.Uint248.IsZero(sdk.Uint248(slot.BlockNum)),
-			lastRatio,
-			api.ToUint248(slot.Value),
-		)
-		// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
-		eth = api.Uint248.Mul(eth, sdk.ConstUint248(1e18))
-		uni, _ := api.Uint248.Div(eth, lastRatio)
-		rblk := api.ToUint248(r.BlockNum)
-		rpoolid := r.Fields[0].Value
-		// find match pool
-		for i := 0; i < MaxPoolNum; i++ {
-			// if poolid match, add uni to total, otherwise keep as is
-			totalUni[i] = api.Uint248.Select(
-				api.Bytes32.IsEqual(rpoolid, c.PoolId[i]),
-				api.Uint248.Add(totalUni[i], uni),
-				totalUni[i],
+			eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
+			slot := in.StorageSlots.Raw[i]
+			// if slot blocknum isn't 0, receipt blocknum should equal slot blocknum
+			api.Uint32.AssertIsEqual(r.BlockNum, api.Uint32.Select(
+				api.Uint32.IsZero(slot.BlockNum),
+				r.BlockNum,
+				slot.BlockNum,
+			))
+			// if slot.BlockNum is 0, use last ratio
+			lastRatio = api.Uint248.Select(
+				api.Uint248.IsZero(sdk.Uint248(slot.BlockNum)),
+				lastRatio,
+				api.ToUint248(slot.Value),
 			)
-			// if poolid match, compare minBlk and maxBlk
-			minBlk[i] = api.Uint248.Select(
-				api.Bytes32.IsEqual(rpoolid, c.PoolId[i]),
-				api.Uint248.Select(
-					api.Uint248.IsLessThan(rblk, minBlk[i]),
-					rblk,
-					minBlk[i],
-				),
-				minBlk[i],
+			// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
+			eth = api.Uint248.Mul(eth, sdk.ConstUint248(1e18))
+			uni, _ := api.Uint248.Div(eth, lastRatio)
+			totalUni[poolidx] = api.Uint248.Add(totalUni[poolidx], uni)
+			minBlk[poolidx] = api.Uint32.Select(
+				api.Uint32.IsLessThan(r.BlockNum, minBlk[poolidx]),
+				r.BlockNum,
+				minBlk[poolidx],
 			)
-			maxBlk[i] = api.Uint248.Select(
-				api.Bytes32.IsEqual(rpoolid, c.PoolId[i]),
-				api.Uint248.Select(
-					api.Uint248.IsGreaterThan(rblk, maxBlk[i]),
-					rblk,
-					maxBlk[i],
-				),
-				maxBlk[i],
+			maxBlk[poolidx] = api.Uint32.Select(
+				api.Uint32.IsGreaterThan(r.BlockNum, maxBlk[poolidx]),
+				r.BlockNum,
+				maxBlk[poolidx],
 			)
 		}
-	}
-	api.OutputAddress(c.Sender)
-	for i := 0; i < MaxPoolNum; i++ {
-		api.OutputBytes32(c.PoolId[i])
-		api.OutputUint(64, minBlk[i])
-		api.OutputUint(64, maxBlk[i])
-		api.OutputUint(128, totalUni[i])
+		api.OutputBytes32(c.PoolId[poolidx])
+		api.OutputUint32(32, minBlk[poolidx])
+		api.OutputUint32(32, maxBlk[poolidx])
+		api.OutputUint(128, totalUni[poolidx])
 	}
 	return nil
 }
