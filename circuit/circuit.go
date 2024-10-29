@@ -3,6 +3,7 @@ package circuit
 import (
 	"encoding/hex"
 	"math"
+	"math/big"
 
 	"github.com/brevis-network/brevis-sdk/sdk"
 )
@@ -20,6 +21,7 @@ const (
 var (
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
 	zeroB32     = sdk.ConstBytes32([]byte{0})
+	e18         = sdk.ConstUint248(new(big.Int).SetUint64(1e18)) // 1e18 exceeds int64
 )
 
 type GasCircuit struct {
@@ -100,11 +102,12 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 				lastRatio,
 				api.ToUint248(slot.Value),
 			)
-			eth := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
+			eth1 := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
 			// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
-			eth = api.Uint248.Mul(eth, sdk.ConstUint248(1e18))
-			uni, _ := api.Uint248.Div(eth, lastRatio)
+			eth2 := api.Uint248.Mul(eth1, e18)
+			uni, _ := api.Uint248.Div(eth2, lastRatio)
 			totalUni[poolidx] = api.Uint248.Add(totalUni[poolidx], uni)
+
 			// possible: receipt[0] for min, last valid receipt for max?
 			minBlk[poolidx] = api.Uint32.Select(
 				// not dummy, and receipt has smaller blocknum

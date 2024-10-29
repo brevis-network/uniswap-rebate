@@ -59,9 +59,11 @@ var proveCmd = &cobra.Command{
 		var err error
 		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(appCircuit, outDir)
 		chkErr(err, "ReadSetupFrom "+outDir)
-		vkhash, err := sdk.ComputeVkHash(vk)
-		chkErr(err, "ComputeVkHash")
-		vkHashStr = fmt.Sprintf("%s", vkhash) // common.Hash.Format adds 0x prefix
+		// var buf bytes.Buffer
+		// vk.WriteTo(&buf)
+		// fmt.Printf("==== vk ====:\n%x", buf.Bytes())
+		vkHashStr = fmt.Sprintf("0x%x", vkHash)
+		log.Infoln("vkHashStr:", vkHashStr)
 		// setup server
 		router := httprouter.New()
 		router.POST("/prove", HandleProve)
@@ -257,7 +259,7 @@ func buildAppCircuitInfo(in sdk.CircuitInput, vk, proof, cbaddr string) *commonp
 func init() {
 	rootCmd.AddCommand(proveCmd)
 	proveCmd.PersistentFlags().StringVar(&outDir, "outDir", "$HOME/circuitOut/unigasrebate", "folder for circuit in/output")
-	proveCmd.PersistentFlags().StringVar(&brvGw, "brvgw", "appsdkv3.brevis.network", "brevis gateway grpc endpoint")
+	proveCmd.PersistentFlags().StringVar(&brvGw, "brvgw", "appsdkv3.brevis.network:443", "brevis gateway grpc endpoint")
 	proveCmd.PersistentFlags().IntVar(&lport, "port", 9003, "listen port for prove request")
 }
 
