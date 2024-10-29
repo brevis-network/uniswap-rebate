@@ -16,3 +16,33 @@ Other projects deploy router contracts and interact with uniswap poolmanager. Un
 2. server will fetch tx receipts, organize events by poolids and start proving process (possible filtering of ineligible pools here)
 3. server submits to Brevis gateway and needs a way to get ready to submit onchain data and save to db
 4. projects polling data and send onchain tx
+
+## Sepolia complete flow
+- this repo, deploy uni/eth price oracle, test contract has ratio in constructor
+- brevis-network/uniswap-v4-core repo mysetup branch, deploy myswaprouter and two erc20s. Note smaller addr token will be currency0.
+- brevis-network/uniswap-v4-template repo my branch, set script/base/Constants.sol POOLMANAGER and posm from [uniswap doc](https://docs.uniswap.org/contracts/v4/deployments), Config.sol token0 and token1 from previous step
+- run 00_Counter to deploy counter hook by CREATE2, then add hook address to Config.sol. CREATE2 due to uniswap requires hook addr to have certain bits set, only possible by mining salt with create2.
+- run 01_CreatePoolAndMintLiquidity
+- set myswaprouter address and modify swap amount in 03_Swap and run script
+
+now we have swap event and slot at same block. next to prove/setup zk related
+
+onchain:
+- this repo, deploy zkrebate and transfer test uni to zkrebate contract
+- run add_pool, make sure PoolKey matches 01_CreatePoolAndMintLiquidity, can query map to check poolid matches
+- add zkrebate to allowed provers. call BrevisProof.addProvers (can use etherscan web, must be owner)
+
+offchain:
+- server must listen to pool Initialize event from 01_CreatePoolAndMintLiquidity blocknumber and populate db
+- send swap tx to server which starts the process and sent to prover
+- prover generates app proof and submits to Brevis Gateway
+
+when proof is ready, submit onchain to myswaprouter:
+- run claim.sol
+
+| Contract  | Address |
+| ------------- | ------------- |
+| Oracle | 0xc8caf3c1d76d264b6d5d511d883b58b3874eafa0 |
+| MySwapRouter | 0xd45f72e31e19fcf75bF47d217e500745Cb36263b |
+| Hook | 0xaA5f84D2F6A2423E50b3e598F934f6626e12CAc0 |
+| ZkRebate | 0xA50e5203ECa1685B4e01A8A569dd12150A8b419D |
