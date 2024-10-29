@@ -8,7 +8,7 @@ import (
 )
 
 const (
-	MaxPerPool  = 128
+	MaxPerPool  = 32
 	MaxPoolNum  = 2
 	MaxReceipts = MaxPerPool * MaxPoolNum
 
