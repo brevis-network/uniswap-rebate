@@ -6,8 +6,9 @@ import {PoolKey} from "v4-core/types/PoolKey.sol";
 import {IERC20} from "forge-std/interfaces/IERC20.sol";
 
 import {IBrevisProof} from "./IBrevisProof.sol";
+import {Ownable} from "./Ownable.sol";
 
-contract ZkRebate {
+contract ZkRebate is Ownable {
     IERC20 public uni;
     IBrevisProof public brvProof;
     bytes32 public vkHash;
@@ -98,5 +99,9 @@ contract ZkRebate {
             }
         }
         return amount;
+    }
+
+    function setvk(bytes32 _vk) external onlyOwner {
+        vkHash = _vk;
     }
 }
