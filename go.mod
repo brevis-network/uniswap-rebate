@@ -3,7 +3,7 @@ module github.com/brevis-network/uniswap-rebate
 go 1.21.8
 
 require (
-	github.com/brevis-network/brevis-sdk v0.3.3
+	github.com/brevis-network/brevis-sdk v0.3.5
 	github.com/cockroachdb/cockroach-go/v2 v2.3.8
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.22.0
