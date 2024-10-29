@@ -2,7 +2,7 @@ db = "localhost:26257"
 grpcport = 9001
 httpport = 9002
 # send reqs to prove server which generates app proof then submit to brv gateway
-prover = "http://localhost:8889"
+prover = "http://localhost:9003"
 
 [[multichain]]
 chainID = 11155111

@@ -257,8 +257,8 @@ func buildAppCircuitInfo(in sdk.CircuitInput, vk, proof, cbaddr string) *commonp
 func init() {
 	rootCmd.AddCommand(proveCmd)
 	proveCmd.PersistentFlags().StringVar(&outDir, "outDir", "$HOME/circuitOut/unigasrebate", "folder for circuit in/output")
-	proveCmd.PersistentFlags().StringVar(&brvGw, "brvgw", "", "brevis gateway grpc endpoint")
-	proveCmd.PersistentFlags().IntVar(&lport, "port", 8889, "listen port for prove request")
+	proveCmd.PersistentFlags().StringVar(&brvGw, "brvgw", "appsdkv3.brevis.network", "brevis gateway grpc endpoint")
+	proveCmd.PersistentFlags().IntVar(&lport, "port", 9003, "listen port for prove request")
 }
 
 func chkErr(err error, msg string) {
