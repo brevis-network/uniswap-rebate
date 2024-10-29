@@ -164,8 +164,11 @@ func DoOneReq(r *onchain.OneProveReq, batchIdx int) (*gwproto.Query, error) {
 	var b bytes.Buffer
 	proof.WriteTo(&b)
 	proofStr := hex.EncodeToString(b.Bytes())
+	b.Reset()
+	publicWitness.WriteTo(&b)
+	witnessStr := hex.EncodeToString(b.Bytes())
 	return &gwproto.Query{
-		AppCircuitInfo:    buildAppCircuitInfo(circuitInput, vkHashStr, proofStr, ""),
+		AppCircuitInfo:    buildAppCircuitInfo(circuitInput, witnessStr, vkHashStr, proofStr, ""),
 		ReceiptInfos:      buildReceiptInfos(receipts),
 		StorageQueryInfos: buildStorageInfos(r.Blks, r.Oracle, onchain.Hash2Hex(onchain.ZeroHash)),
 	}, nil
@@ -233,7 +236,7 @@ func buildReceiptInfos(r []*sdk.ReceiptData) (infos []*gwproto.ReceiptInfo) {
 	return
 }
 
-func buildAppCircuitInfo(in sdk.CircuitInput, vk, proof, cbaddr string) *commonproto.AppCircuitInfoWithProof {
+func buildAppCircuitInfo(in sdk.CircuitInput, witness, vk, proof, cbaddr string) *commonproto.AppCircuitInfoWithProof {
 	inputCommitments := make([]string, len(in.InputCommitments))
 	for i, value := range in.InputCommitments {
 		inputCommitments[i] = fmt.Sprintf("0x%x", value)
@@ -253,6 +256,13 @@ func buildAppCircuitInfo(in sdk.CircuitInput, vk, proof, cbaddr string) *commonp
 		Output:            hex.EncodeToString(in.GetAbiPackedOutput()),
 		Proof:             proof,
 		CallbackAddr:      cbaddr,
+		// new fields required by plonky2
+		InputCommitmentsRoot: fmt.Sprintf("0x%x", in.InputCommitmentsRoot),
+		Witness:              witness,
+		MaxReceipts:          circuit.MaxReceipts,
+		MaxStorage:           circuit.MaxReceipts,
+		MaxTx:                0,
+		MaxNumDataPoints:     128, // hardcode for now
 	}
 }
 
