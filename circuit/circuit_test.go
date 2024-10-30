@@ -23,8 +23,9 @@ func TestCircuit(t *testing.T) {
 	app, _ := sdk.NewBrevisApp(1, "https://eth.llamarpc.com", "$HOME/circuitOut/unigasrebate")
 	// ========== receipts
 	// first 2 receipts from same block
-	app.AddMockReceipt(
+	app.AddReceipt(
 		sdk.ReceiptData{
+			TxHash:       common.Hash{0},
 			BlockNum:     big.NewInt(1),
 			BlockBaseFee: big.NewInt(1e9),
 			MptKeyPath:   TxIdx2MptPath(10),
@@ -34,8 +35,9 @@ func TestCircuit(t *testing.T) {
 			},
 		},
 	)
-	app.AddMockReceipt(
+	app.AddReceipt(
 		sdk.ReceiptData{
+			TxHash:       common.Hash{1},
 			BlockNum:     big.NewInt(1),
 			BlockBaseFee: big.NewInt(1e9),
 			MptKeyPath:   TxIdx2MptPath(10),
@@ -45,8 +47,9 @@ func TestCircuit(t *testing.T) {
 			},
 		},
 	)
-	app.AddMockReceipt(
+	app.AddReceipt(
 		sdk.ReceiptData{
+			TxHash:       common.Hash{2},
 			BlockNum:     big.NewInt(2),
 			BlockBaseFee: big.NewInt(2e9),
 			MptKeyPath:   TxIdx2MptPath(10),
@@ -57,7 +60,7 @@ func TestCircuit(t *testing.T) {
 		},
 	)
 	// ========== slots
-	app.AddMockStorage(
+	app.AddStorage(
 		sdk.StorageData{
 			BlockNum:     big.NewInt(1),
 			BlockBaseFee: big.NewInt(1e9),
@@ -67,7 +70,7 @@ func TestCircuit(t *testing.T) {
 		}, // first slot, no need for index
 	)
 	// storage 1 is dummy
-	app.AddMockStorage(
+	app.AddStorage(
 		sdk.StorageData{
 			BlockNum:     big.NewInt(2),
 			BlockBaseFee: big.NewInt(2e9),
