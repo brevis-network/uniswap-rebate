@@ -120,7 +120,7 @@ func ProveReqs(reqs []*onchain.OneProveReq) {
 func DoOneReq(r *onchain.OneProveReq, batchIdx int) (*gwproto.Query, error) {
 	log.Infoln("req", r.ReqId, "pools:", r.PoolIds)
 
-	app, _ := sdk.NewBrevisApp(r.ChainId, brvGw)
+	app, _ := sdk.NewBrevisApp(r.ChainId, "RPC_URL", "$HOME/circuitOut/unigasrebate", brvGw)
 	var receipts []*sdk.ReceiptData
 	var lastBlockNum uint64
 	for i, onelog := range r.Logs {
