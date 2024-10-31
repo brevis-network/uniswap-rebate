@@ -20,15 +20,16 @@ const (
 )
 
 func TestCircuit(t *testing.T) {
-	app, _ := sdk.NewBrevisApp(1)
+	app, _ := sdk.NewBrevisApp(1, "https://eth.llamarpc.com", "$HOME/circuitOut/unigasrebate")
 	// ========== receipts
 	// first 2 receipts from same block
 	app.AddReceipt(
 		sdk.ReceiptData{
+			TxHash:       common.Hash{0},
 			BlockNum:     big.NewInt(1),
 			BlockBaseFee: big.NewInt(1e9),
 			MptKeyPath:   TxIdx2MptPath(10),
-			Fields: [4]sdk.LogFieldData{
+			Fields: []sdk.LogFieldData{
 				newLog(1, 1, PoolId),
 				newLog(1, 2, Sender),
 			},
@@ -36,10 +37,11 @@ func TestCircuit(t *testing.T) {
 	)
 	app.AddReceipt(
 		sdk.ReceiptData{
+			TxHash:       common.Hash{1},
 			BlockNum:     big.NewInt(1),
 			BlockBaseFee: big.NewInt(1e9),
 			MptKeyPath:   TxIdx2MptPath(10),
-			Fields: [4]sdk.LogFieldData{
+			Fields: []sdk.LogFieldData{
 				newLog(2, 1, PoolId),
 				newLog(2, 2, Sender),
 			},
@@ -47,10 +49,11 @@ func TestCircuit(t *testing.T) {
 	)
 	app.AddReceipt(
 		sdk.ReceiptData{
+			TxHash:       common.Hash{2},
 			BlockNum:     big.NewInt(2),
 			BlockBaseFee: big.NewInt(2e9),
 			MptKeyPath:   TxIdx2MptPath(10),
-			Fields: [4]sdk.LogFieldData{
+			Fields: []sdk.LogFieldData{
 				newLog(1, 1, PoolId),
 				newLog(1, 2, Sender),
 			},
