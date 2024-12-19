@@ -77,16 +77,16 @@ func (r *OneProveReq) NewCircuit() *circuit.GasCircuit {
 	ret := &circuit.GasCircuit{
 		PoolMgr:    sdk.ConstUint248(Hex2Bytes(r.PoolMgr)),
 		Sender:     sdk.ConstUint248(Hex2Bytes(r.Sender)),
-		Oracle:     sdk.ConstUint248(Hex2Bytes(r.Oracle)),
 		GasPerSwap: sdk.ConstUint248(r.GasPerSwap),
 	}
-
-	for i, pid := range r.PoolIds {
-		ret.PoolId[i] = sdk.ConstBytes32(Hex2Bytes(pid))
-	}
-	for i := len(r.PoolIds); i < circuit.MaxPoolNum; i++ {
-		ret.PoolId[i] = sdk.ConstBytes32([]byte{0})
-	}
+	/*
+		for i, pid := range r.PoolIds {
+			ret.PoolId[i] = sdk.ConstBytes32(Hex2Bytes(pid))
+		}
+		for i := len(r.PoolIds); i < circuit.MaxPoolNum; i++ {
+			ret.PoolId[i] = sdk.ConstBytes32([]byte{0})
+		}
+	*/
 	return ret
 }
 

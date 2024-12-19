@@ -56,27 +56,6 @@ func TestCircuit(t *testing.T) {
 			},
 		},
 	)
-	// ========== slots
-	app.AddStorage(
-		sdk.StorageData{
-			BlockNum:     big.NewInt(1),
-			BlockBaseFee: big.NewInt(1e9),
-			Address:      common.HexToAddress(Oracle),
-			Slot:         common.HexToHash("0x00"),
-			Value:        common.BigToHash(big.NewInt(1e16)),
-		}, // first slot, no need for index
-	)
-	// storage 1 is dummy
-	app.AddStorage(
-		sdk.StorageData{
-			BlockNum:     big.NewInt(2),
-			BlockBaseFee: big.NewInt(2e9),
-			Address:      common.HexToAddress(Oracle),
-			Slot:         common.HexToHash("0x00"),
-			Value:        common.BigToHash(big.NewInt(2e16)),
-		},
-		2, // specify index 2 so index 1 is dummy
-	)
 
 	defaultC := DefaultCircuit()
 	newC := NewCircuit()
@@ -107,12 +86,10 @@ func NewCircuit() *GasCircuit {
 	ret := &GasCircuit{
 		PoolMgr:    sdk.ConstUint248(Hex2Bytes(PoolMgr)),
 		Sender:     sdk.ConstUint248(Hex2Bytes(Sender)),
-		Oracle:     sdk.ConstUint248(Hex2Bytes(Oracle)),
 		GasPerSwap: sdk.ConstUint248(50000),
 	}
-	ret.PoolId[0] = sdk.ConstBytes32(Hex2Bytes(PoolId))
-	for i := 1; i < MaxPoolNum; i++ {
-		ret.PoolId[i] = zeroB32
+	for i := 0; i < MaxPoolNum; i++ {
+		ret.PoolKey[i] = [5]sdk.Bytes32{zeroB32, zeroB32, zeroB32, zeroB32, zeroB32}
 	}
 	return ret
 }

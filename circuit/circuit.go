@@ -3,130 +3,97 @@ package circuit
 import (
 	"encoding/hex"
 	"math"
-	"math/big"
 
 	"github.com/brevis-network/brevis-sdk/sdk"
 )
 
 const (
-	MaxPerPool  = 32
-	MaxPoolNum  = 2
+	MaxPerPool  = 256
+	MaxPoolNum  = 16
 	MaxReceipts = MaxPerPool * MaxPoolNum
 
-	// needed to compare min blknum
-	// maxU64 uint64 = math.MaxUint64
 	maxU32 uint32 = math.MaxUint32
 )
 
 var (
+	// single event that tells us claimer address, event is Claimer(address)
+	EventIdClaimer = sdk.ParseEventID(Hex2Bytes("0x8d5763b8f1aa10a2a7039efd8f390755df967d1e68f0a76dd56ceee013227162"))
+	// all swaps of same router
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
-	zeroB32     = sdk.ConstBytes32([]byte{0})
-	e18         = sdk.ConstUint248(new(big.Int).SetUint64(1e18)) // 1e18 exceeds int64
+	// const
+	zeroB32 = sdk.ConstBytes32([]byte{0})
 )
 
 type GasCircuit struct {
-	PoolMgr sdk.Uint248 // PoolManager addr
-	Sender  sdk.Uint248 // msg.sender of swaps
-	Oracle  sdk.Uint248 // price oracle addr, ratio at slot0, value is ratio*10^18. note this is uni to eth ratio so we divide it to convert eth to uni
-	PoolId  [MaxPoolNum]sdk.Bytes32
+	PoolMgr sdk.Uint248                // PoolManager addr
+	Sender  sdk.Uint248                // msg.sender of swaps
+	PoolKey [MaxPoolNum][5]sdk.Bytes32 // each poolkey has 5 fields, poolid = keccak(abi.encode(poolkey))
 	// gas amount of one swap event
 	GasPerSwap sdk.Uint248
 }
 
 // duplicated slots will be empty/dummy
 func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
-	return MaxReceipts, MaxReceipts, 0
+	return MaxReceipts, 0, 0
 }
 
-// one receipt has 2 fields, which are same swap log different fields (poolid, sender)
-// receipts must be ordered by block num and if multiple receipts have same block num,
-// only first corresponding slot has actual data, rests are dummy
-// receipts: b1r1, b1r2, b1r3, b2r1
-// slots: b1s1, 0, 0, b2s1
-// first MaxPerPool data is for poolid[0], etc.
+// receipt[0] is claimer event, [1:] are all swaps, [MaxPerPool][MaxPerPool]..  MaxPoolNum segments
+// one swap receipt has 2 fields, which are same swap log different fields (poolid, sender)
 func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
+	// each receipt must be unique
 	api.AssertInputsAreUnique()
-	receipts := sdk.NewDataStream(api, in.Receipts)
-	// for each receipt, make sure it's from expected msg.sender
-	sdk.AssertEach(receipts, func(r sdk.Receipt) sdk.Uint248 {
-		swapLog := r.Fields[0]
-		swapLog2 := r.Fields[1]
-		return api.Uint248.And(
-			api.Uint248.IsEqual(swapLog.Contract, c.PoolMgr),
-			api.Uint248.IsEqual(swapLog2.Contract, c.PoolMgr),
-			api.Uint248.IsEqual(swapLog.EventID, EventIdSwap),
-			api.Uint248.IsEqual(swapLog2.EventID, EventIdSwap),
-			api.Uint248.IsEqual(api.ToUint248(swapLog2.Value), c.Sender),
-		)
-	})
-
-	// per pool min/max blknum and totalUni
-	minBlk := [MaxPoolNum]sdk.Uint32{}
-	maxBlk := [MaxPoolNum]sdk.Uint32{}
-	totalUni := [MaxPoolNum]sdk.Uint248{}
-	for i := 0; i < MaxPoolNum; i++ {
-		minBlk[i] = sdk.ConstUint32(maxU32)
-		maxBlk[i] = sdk.ConstUint32(0)
-		totalUni[i] = sdk.ConstUint248(0)
-	}
+	// check first receipt and output router and claimer address
+	claimev := in.Receipts.Raw[0].Fields[0]
+	api.Uint248.AssertIsEqual(claimev.Contract, c.Sender)
+	api.Uint248.AssertIsEqual(claimev.EventID, EventIdClaimer)
 	api.OutputAddress(c.Sender)
-	lastRatio := sdk.ConstUint248(0) // save last slot for same block
-	// note if lastRatio is per poolid segment, empty poolid will cause div by zero
-	// split input into segments
-	for poolidx := 0; poolidx < MaxPoolNum; poolidx++ {
-		// for each swap, eth cost is GasPerSwap*BaseFee, then convert to uni
+	api.OutputAddress(api.ToUint248(claimev.Value))
 
-		baseIdx := poolidx * MaxPerPool
-		// receipt and storage index
-		for i := baseIdx; i < MaxPerPool+baseIdx; i++ {
-			r := in.Receipts.Raw[i]
-			// if r.BlockNum is 0, consider data is a dummy so do nothing
-			isDummy := api.Uint32.IsZero(r.BlockNum)
-			// ensure poolid matches
-			api.Bytes32.AssertIsEqual(c.PoolId[poolidx], api.Bytes32.Select(
-				api.ToUint248(isDummy),
-				c.PoolId[poolidx],
-				r.Fields[0].Value,
-			))
+	// check pool has non-zero hook and compute poolID
+	var poolIDs [MaxPoolNum]sdk.Bytes32
+	for i := 0; i < MaxPoolNum; i++ {
+		// check hook isn't zero
+		api.Uint248.AssertIsDifferent(api.ToUint248(c.PoolKey[i][4]), sdk.ConstUint248(0))
+		poolIDs[i] = api.Keccak256(c.PoolKey[i][:], []int32{256, 256, 256, 256, 256})
+	}
 
-			slot := in.StorageSlots.Raw[i]
-			// if slot blocknum isn't 0, receipt blocknum should equal slot blocknum
-			api.Uint32.AssertIsEqual(r.BlockNum, api.Uint32.Select(
-				api.Uint32.Or(isDummy, api.Uint32.IsZero(slot.BlockNum)),
-				r.BlockNum,
-				slot.BlockNum,
-			))
-			// if slot.BlockNum is 0, use last ratio
-			lastRatio = api.Uint248.Select(
-				api.Uint248.Or(api.ToUint248(isDummy), api.Uint248.IsZero(api.ToUint248(slot.BlockNum))),
-				lastRatio,
-				api.ToUint248(slot.Value),
-			)
-			eth1 := api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)
-			// ratio value is actual ratio * 10^18, this is uni to eth eg. 0.003, so eth / ratio get uni
-			eth2 := api.Uint248.Mul(eth1, e18)
-			uni, _ := api.Uint248.Div(eth2, lastRatio)
-			totalUni[poolidx] = api.Uint248.Add(totalUni[poolidx], uni)
-
-			// possible: receipt[0] for min, last valid receipt for max?
-			minBlk[poolidx] = api.Uint32.Select(
-				// not dummy, and receipt has smaller blocknum
-				api.Uint32.And(api.Uint32.Not(isDummy), api.Uint32.IsLessThan(r.BlockNum, minBlk[poolidx])),
-				r.BlockNum,
-				minBlk[poolidx],
-			)
-			maxBlk[poolidx] = api.Uint32.Select(
-				api.Uint32.And(api.Uint32.Not(isDummy), api.Uint32.IsGreaterThan(r.BlockNum, maxBlk[poolidx])),
-				r.BlockNum,
-				maxBlk[poolidx],
-			)
-		}
-		api.OutputBytes32(c.PoolId[poolidx])
-		api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
-		api.OutputUint32(32, minBlk[poolidx])
-		api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
-		api.OutputUint32(32, maxBlk[poolidx])
-		api.OutputUint(128, totalUni[poolidx])
+	minBlk := sdk.ConstUint32(maxU32)
+	maxBlk := sdk.ConstUint32(0)
+	swapGas := sdk.ConstUint248(0) // total number of swaps
+	// receipt idx start from 1 as 0 is for claimer
+	for i := 1; i < MaxReceipts; i++ {
+		r := in.Receipts.Raw[i]
+		valid := sdk.Uint248{Val: in.Receipts.Toggles[i]}
+		// if valid, check receipt fields are expected
+		poolidx := (i - 1) / MaxPerPool
+		api.Bytes32.AssertIsEqual(poolIDs[poolidx], api.Bytes32.Select(
+			valid,
+			r.Fields[0].Value,
+			poolIDs[poolidx]))
+		api.Uint248.AssertIsEqual(valid, api.Uint248.And(
+			api.Uint248.IsEqual(r.Fields[0].Contract, c.PoolMgr),
+			api.Uint248.IsEqual(r.Fields[1].Contract, c.PoolMgr),
+			api.Uint248.IsEqual(r.Fields[0].EventID, EventIdSwap),
+			api.Uint248.IsEqual(r.Fields[1].EventID, EventIdSwap),
+			api.Uint248.IsEqual(api.ToUint248(r.Fields[1].Value), c.Sender),
+		))
+		// if valid,  sum gas cost, update min/max blk
+		swapGas = api.Uint248.Select(
+			valid,
+			api.Uint248.Add(swapGas, api.Uint248.Mul(r.BlockBaseFee, c.GasPerSwap)),
+			swapGas,
+		)
+		validU32 := sdk.Uint32{Val: in.Receipts.Toggles[i]}
+		minBlk = api.Uint32.Select(
+			api.Uint32.And(validU32, api.Uint32.IsLessThan(r.BlockNum, minBlk)),
+			r.BlockNum,
+			minBlk,
+		)
+		maxBlk = api.Uint32.Select(
+			api.Uint32.And(validU32, api.Uint32.IsGreaterThan(r.BlockNum, maxBlk)),
+			r.BlockNum,
+			maxBlk,
+		)
 	}
 	return nil
 }
@@ -135,11 +102,10 @@ func DefaultCircuit() *GasCircuit {
 	ret := &GasCircuit{
 		PoolMgr:    sdk.ConstUint248(0),
 		Sender:     sdk.ConstUint248(0),
-		Oracle:     sdk.ConstUint248(0),
 		GasPerSwap: sdk.ConstUint248(0),
 	}
 	for i := 0; i < MaxPoolNum; i++ {
-		ret.PoolId[i] = zeroB32
+		ret.PoolKey[i] = [5]sdk.Bytes32{zeroB32, zeroB32, zeroB32, zeroB32, zeroB32}
 	}
 	return ret
 }
