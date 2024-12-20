@@ -95,6 +95,11 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 			maxBlk,
 		)
 	}
+	api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
+	api.OutputUint32(32, minBlk)
+	api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
+	api.OutputUint32(32, maxBlk)
+	api.OutputUint(128, swapGas)
 	return nil
 }
 
