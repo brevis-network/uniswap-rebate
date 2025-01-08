@@ -37,8 +37,9 @@ func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 	return MaxReceipts, 0, 0
 }
 
-// receipt[0] is claimer event, [1:] are all swaps, [MaxPerPool][MaxPerPool]..  MaxPoolNum segments
-// one swap receipt has 2 fields, which are same swap log different fields (poolid, sender)
+// receipt[0] is claimer event, [1:] are all swaps, [MaxPerPool][MaxPerPool].. with MaxPoolNum segments
+// note last segment has MaxPerPool-1 receipts.
+// one swap receipt has 2 fields, poolid and sender from the same swap log
 func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	// each receipt must be unique
 	api.AssertInputsAreUnique()
@@ -46,6 +47,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	claimev := in.Receipts.Raw[0].Fields[0]
 	api.Uint248.AssertIsEqual(claimev.Contract, c.Sender)
 	api.Uint248.AssertIsEqual(claimev.EventID, EventIdClaimer)
+
 	api.OutputAddress(c.Sender)
 	api.OutputAddress(api.ToUint248(claimev.Value))
 
@@ -59,7 +61,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 
 	minBlk := sdk.ConstUint32(maxU32)
 	maxBlk := sdk.ConstUint32(0)
-	swapGas := sdk.ConstUint248(0) // total number of swaps
+	swapGas := sdk.ConstUint248(0)
 	// receipt idx start from 1 as 0 is for claimer
 	for i := 1; i < MaxReceipts; i++ {
 		r := in.Receipts.Raw[i]
