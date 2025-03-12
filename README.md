@@ -1,10 +1,12 @@
 # uniswap-rebate
 This is NOT a uniswap v4 hook, but to give fee rebate to pools w/ non-zero hooks address.
 
-v2 supports multiple pools in one app proof and use single or agg proof onchain
+See https://github.com/uniswapfoundation/router-rebates/ for more details. Onchain claim code is integrated into Uniswap's contract.
 
-## Use case
-Other projects deploy router contracts and interact with uniswap poolmanager. Uniswap will rebate gas fees in UNI if swap pool has hooks. Projects need to initiate claim flow and it's up to them how to distribute to actual users. Uniswap may have an internal implementation based on centralized signature. Brevis will provide a zk-based solution
+Over the time, scope/requirements have changed multiple times. Latest as of 2025-03-10:
+1. swaps may happen on 12 univ4 chains. claim only happens on unichain
+2. rebate gas cost in Eth
+3. each router impl `rebateClaimer() view` to indicate which address is allowed to call claim onchain
 
 ## High level design
 1. Due to uniswap contract doesn't save PoolKey (a struct about the pool including hooks address), we need to filter non-eligible pools ourselves. Onchain contract keeps a map of poolid->bool, there is a public api addPool(PoolKey) can be called by anyone, it checks poolkey.hooks isn’t all 0 and saves key.toId() to map. Compare to check in zk circuit, this has higher onchain cost per pool but minimal eng complexity (as keccak to compute poolid is not easy using sdk)

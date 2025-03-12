@@ -88,8 +88,8 @@ func NewCircuit() *GasCircuit {
 		Sender:     sdk.ConstUint248(Hex2Bytes(Sender)),
 		GasPerSwap: sdk.ConstUint248(50000),
 	}
-	for i := 0; i < MaxPoolNum; i++ {
-		ret.PoolKey[i] = [5]sdk.Bytes32{zeroB32, zeroB32, zeroB32, zeroB32, zeroB32}
+	for i := 0; i < MaxPoolNum*5; i++ {
+		ret.PoolKey[i] = zeroB32
 	}
 	return ret
 }
