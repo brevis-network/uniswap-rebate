@@ -4,14 +4,18 @@ This is NOT a uniswap v4 hook, but to give fee rebate to pools w/ non-zero hooks
 See https://github.com/uniswapfoundation/router-rebates/ for more details. Onchain claim code is integrated into Uniswap's contract.
 
 Over the time, scope/requirements have changed multiple times. Latest as of 2025-03-10:
-1. swaps may happen on 12 univ4 chains. claim only happens on unichain
-2. rebate gas cost in Eth
-3. each router impl `rebateClaimer() view` to indicate which address is allowed to call claim onchain
+1. swaps may happen on multiple chains that have uniswap v4 deployed. claim only happens on unichain
+2. each router impl `rebateClaimer() view` to indicate which address is allowed to call claim onchain
+3. rebate gas cost in Eth. rebate gas for one tx is `n * (rebatePerSwap+rebatePerHook) + rebateFixed` where n is number of valid swaps in this tx. Then compare the result with tx's actual gas usage * 0.8  and choose the smaller one
+
+## ClaimHelp and Create2
+Initially we expected router to emit Claimer address but final design only has view func. We deploy a helper contract to call rebateClaimer and emit both router and claimer address. Use create2 to ensure ClaimHelp is deployed at the same address on every supported chain.
+- `Claimer(address,address)` event ID: 0xf0d796bb38c321bf748f9334d1b7b16ba5fb79e2112396aa77c47cd5d21a8b2f
+- use `cast create2 -s 0x112233` to get a salt so deployed addr starts w/ 0x112233. full addr is 0x112233C73c74a810BA963171ADc431A60e051D38
+- for full verification, we include [metadata](https://book.getfoundry.sh/guides/deterministic-deployments-using-create2#metadata-and-bytecode) downside is ClaimHelp.sol file must be kept exactly the same (even extra space will change code hash)
+- operation overhead is to call `claim(address router)` for supported routers
 
 ## High level design
-1. Due to uniswap contract doesn't save PoolKey (a struct about the pool including hooks address), we need to filter non-eligible pools ourselves. Onchain contract keeps a map of poolid->bool, there is a public api addPool(PoolKey) can be called by anyone, it checks poolkey.hooks isn’t all 0 and saves key.toId() to map. Compare to check in zk circuit, this has higher onchain cost per pool but minimal eng complexity (as keccak to compute poolid is not easy using sdk)
-2. rebate contract maintains addr->poolid->blocknum map to avoid replay
-3. Circuit output: addr,[poolid,firstblk,lastblk,u128(uni)] contract will check poolid is in eligible map and firstblk > saved blocknum, sum uni across all pools, then send total uni to specified recipient.
 
 ## Flow
 1. projects submit list of tx hashes to brevis unirebate server and get a request id

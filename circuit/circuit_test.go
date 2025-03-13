@@ -90,7 +90,6 @@ func newLog(logIdx, fieldIdx uint, value string) sdk.LogFieldData {
 func NewCircuit() *GasCircuit {
 	ret := &GasCircuit{
 		PoolMgr:    sdk.ConstUint248(Hex2Bytes(PoolMgr)),
-		Sender:     sdk.ConstUint248(Hex2Bytes(Sender)),
 		GasPerSwap: sdk.ConstUint248(50000),
 	}
 	for i := 0; i < MaxPoolNum*5; i++ {

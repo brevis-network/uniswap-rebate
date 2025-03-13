@@ -16,8 +16,9 @@ const (
 )
 
 var (
-	// single event that tells us claimer address, event is Claimer(address)
-	EventIdClaimer = sdk.ParseEventID(Hex2Bytes("0x8d5763b8f1aa10a2a7039efd8f390755df967d1e68f0a76dd56ceee013227162"))
+	// single event that tells us router and claimer address, event is Claimer(address,address)
+	EventIdClaimer = sdk.ParseEventID(Hex2Bytes("0xf0d796bb38c321bf748f9334d1b7b16ba5fb79e2112396aa77c47cd5d21a8b2f"))
+	ClaimHelpAddr  = sdk.ConstUint248(Hex2Bytes("0x112233C73c74a810BA963171ADc431A60e051D38"))
 	// all swaps of same router
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
 	// const
@@ -26,7 +27,6 @@ var (
 
 type GasCircuit struct {
 	PoolMgr sdk.Uint248                 // PoolManager addr
-	Sender  sdk.Uint248                 // msg.sender of swaps
 	PoolKey [MaxPoolNum * 5]sdk.Bytes32 // each poolkey has 5 fields, poolid = keccak(abi.encode(poolkey))
 	// gas rebate of one swap event and per tx.
 	// rebate gas for one tx is `n * (rebatePerSwap+rebatePerHook) + rebateFixed` where n is number of valid swaps in this tx.
@@ -57,8 +57,10 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 
 	// check first receipt is Claimer
 	claimEv := in.Receipts.Raw[0]
-	api.Uint248.AssertIsEqual(claimEv.Fields[0].Contract, c.Sender)
+	api.Uint248.AssertIsEqual(claimEv.Fields[0].Contract, ClaimHelpAddr)
 	api.Uint248.AssertIsEqual(claimEv.Fields[0].EventID, EventIdClaimer)
+	router := api.ToUint248(claimEv.Fields[0].Value)
+	claimer := api.ToUint248(claimEv.Fields[1].Value)
 
 	// build datastream for all swaps, limited by sdk api, have to create for all receipts first then [1:]
 	receipts := sdk.NewDataStream(api, in.Receipts)
@@ -70,7 +72,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 			api.Uint248.IsEqual(r.Fields[1].Contract, c.PoolMgr),
 			api.Uint248.IsEqual(r.Fields[0].EventID, EventIdSwap),
 			api.Uint248.IsEqual(r.Fields[1].EventID, EventIdSwap),
-			api.Uint248.IsEqual(api.ToUint248(r.Fields[1].Value), c.Sender),
+			api.Uint248.IsEqual(api.ToUint248(r.Fields[1].Value), router),
 		)
 		eligible := sdk.ConstUint32(0) // check event poolid with all poolids
 		for j := 0; j < MaxPoolNum; j++ {
@@ -133,8 +135,8 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	})
 
 	// output router and claimer address
-	api.OutputAddress(c.Sender)
-	api.OutputAddress(api.ToUint248(in.Receipts.Raw[0].Fields[0].Value))
+	api.OutputAddress(router)
+	api.OutputAddress(claimer)
 
 	api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
 	api.OutputUint32(32, minBlk)
@@ -147,7 +149,6 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 func DefaultCircuit() *GasCircuit {
 	ret := &GasCircuit{
 		PoolMgr:    sdk.ConstUint248(0),
-		Sender:     sdk.ConstUint248(0),
 		GasPerSwap: sdk.ConstUint248(0),
 		GasPerTx:   sdk.ConstUint248(0),
 	}
