@@ -9,8 +9,8 @@ import (
 
 const (
 	MaxPoolNum  = 4
-	MaxSwapNum  = 1023 // need 1 more for claimer
-	MaxReceipts = MaxSwapNum + 1
+	MaxReceipts = 1024
+	MaxSwapNum  = MaxReceipts - 1 // need 1 for claimer
 
 	maxU32 uint32 = math.MaxUint32
 )
@@ -55,9 +55,16 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		poolIDs[i] = api.Keccak256(c.PoolKey[idx:idx+5], []int32{256, 256, 256, 256, 256})
 	}
 
-	// for each receipt, ensure its poolid at least matches one in poolIDs
+	// check first receipt is Claimer
+	claimEv := in.Receipts.Raw[0]
+	api.Uint248.AssertIsEqual(claimEv.Fields[0].Contract, c.Sender)
+	api.Uint248.AssertIsEqual(claimEv.Fields[0].EventID, EventIdClaimer)
+
+	// build datastream for all swaps, limited by sdk api, have to create for all receipts first then [1:]
 	receipts := sdk.NewDataStream(api, in.Receipts)
-	sdk.AssertEach(receipts, func(r sdk.Receipt) sdk.Uint248 {
+	swaps := sdk.RangeUnderlying(receipts, 1, MaxReceipts)
+	// for each swap, ensure it's expected and eligible
+	sdk.AssertEach(swaps, func(r sdk.Receipt) sdk.Uint248 {
 		isSwap := api.Uint248.And(
 			api.Uint248.IsEqual(r.Fields[0].Contract, c.PoolMgr),
 			api.Uint248.IsEqual(r.Fields[1].Contract, c.PoolMgr),
@@ -74,15 +81,8 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 				eligible,
 			)
 		}
-		// if swap, must be eligible, if not swap, must be claim ev
-		return api.Uint248.Select(
-			isSwap,
-			api.ToUint248(eligible),
-			api.Uint248.And(
-				api.Uint248.IsEqual(r.Fields[0].Contract, c.Sender),
-				api.Uint248.IsEqual(r.Fields[0].EventID, EventIdClaimer),
-			),
-		)
+
+		return api.Uint248.And(isSwap, api.ToUint248(eligible))
 	})
 
 	curTxGas := sdk.ConstUint248(0)    // sum gas of the same tx
@@ -116,20 +116,17 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 			curTxGas,
 		)
 	}
-	// if we can make receipts only include swap, it's easy but if it also has claim ev, have to do it manually
-	//blkNums := sdk.Map(receipts, func(r sdk.Receipt) sdk.Uint32 {})
-	minBlk := sdk.Reduce(receipts, sdk.ConstUint32(maxU32), func(minBlk sdk.Uint32, r sdk.Receipt) sdk.Uint32 {
-		isSwap := sdk.Uint32{Val: api.Uint248.IsEqual(r.Fields[0].EventID, EventIdSwap).Val}
+	// we could usd blkNums := sdk.Map then Min/Max but need to convert Uint32 to Uint248
+	minBlk := sdk.Reduce(swaps, sdk.ConstUint32(maxU32), func(minBlk sdk.Uint32, r sdk.Receipt) sdk.Uint32 {
 		return api.Uint32.Select(
-			api.Uint32.And(isSwap, api.Uint32.IsLessThan(r.BlockNum, minBlk)),
+			api.Uint32.IsLessThan(r.BlockNum, minBlk),
 			r.BlockNum,
 			minBlk,
 		)
 	})
-	maxBlk := sdk.Reduce(receipts, sdk.ConstUint32(0), func(maxBlk sdk.Uint32, r sdk.Receipt) sdk.Uint32 {
-		isSwap := sdk.Uint32{Val: api.Uint248.IsEqual(r.Fields[0].EventID, EventIdSwap).Val}
+	maxBlk := sdk.Reduce(swaps, sdk.ConstUint32(0), func(maxBlk sdk.Uint32, r sdk.Receipt) sdk.Uint32 {
 		return api.Uint32.Select(
-			api.Uint32.And(isSwap, api.Uint32.IsGreaterThan(r.BlockNum, maxBlk)),
+			api.Uint32.IsGreaterThan(r.BlockNum, maxBlk),
 			r.BlockNum,
 			minBlk,
 		)
