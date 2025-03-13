@@ -19,6 +19,11 @@ const (
 	SwapEvId = "0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"
 )
 
+func TestCompile(t *testing.T) {
+	// quickly get constraints size
+	sdk.CompileOnly(DefaultCircuit())
+}
+
 func TestCircuit(t *testing.T) {
 	app, _ := sdk.NewBrevisApp(1)
 	// ========== receipts

@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	MaxPoolNum  = 4
-	MaxReceipts = 1024
+	MaxPoolNum  = 64
+	MaxReceipts = 512
 	MaxSwapNum  = MaxReceipts - 1 // need 1 for claimer
 
 	maxU32 uint32 = math.MaxUint32
@@ -37,7 +37,7 @@ type GasCircuit struct {
 }
 
 func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
-	return MaxSwapNum + 1, 0, 0
+	return MaxReceipts, 0, 0
 }
 
 // receipt[0] is claimer event, [1:] are all swaps
