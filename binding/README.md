@@ -1,0 +1,1 @@
+`jq .abi xxx.json | abigen -abi - -pkg binding -type Xxx -out xxx.go` for ABI only, no deploy

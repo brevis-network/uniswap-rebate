@@ -13,12 +13,14 @@ const (
 	MaxSwapNum  = MaxReceipts - 1 // need 1 for claimer
 
 	maxU32 uint32 = math.MaxUint32
+	// create2 guarantee same addr on every chain
+	ClaimHelp = "0x112233C73c74a810BA963171ADc431A60e051D38"
 )
 
 var (
 	// single event that tells us router and claimer address, event is Claimer(address,address)
 	EventIdClaimer = sdk.ParseEventID(Hex2Bytes("0xf0d796bb38c321bf748f9334d1b7b16ba5fb79e2112396aa77c47cd5d21a8b2f"))
-	ClaimHelpAddr  = sdk.ConstUint248(Hex2Bytes("0x112233C73c74a810BA963171ADc431A60e051D38"))
+	ClaimHelpAddr  = sdk.ConstUint248(Hex2Bytes(ClaimHelp))
 	// all swaps of same router
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
 	// const
@@ -30,10 +32,10 @@ type GasCircuit struct {
 	PoolKey [MaxPoolNum * 5]sdk.Bytes32 // each poolkey has 5 fields, poolid = keccak(abi.encode(poolkey))
 	// gas rebate of one swap event and per tx.
 	// rebate gas for one tx is `n * (rebatePerSwap+rebatePerHook) + rebateFixed` where n is number of valid swaps in this tx.
-	GasPerSwap, GasPerTx sdk.Uint248
+	GasPerSwap, GasPerTx sdk.Uint32
 	// compare the result computed by `n * (rebatePerSwap+rebatePerHook) + rebateFixed` with tx's actual gas usage * 0.8  and choose the smaller one.
 	// so here the value is tx actual gas * 0.8. Note if a tx has k valid swaps, there are k entries and first k-1 are all 0, only last one is actual gas cap
-	TxGasCap [MaxSwapNum]sdk.Uint248
+	TxGasCap [MaxSwapNum]sdk.Uint32
 }
 
 func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
@@ -87,34 +89,50 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		return api.Uint248.And(isSwap, api.ToUint248(eligible))
 	})
 
-	curTxGas := sdk.ConstUint248(0)    // sum gas of the same tx
+	// if TxGasCap[i] is 0, check current receipt has same blknum and mpt as next receipt. no need to check last receipt
+	for i := 1; i < MaxSwapNum; i++ {
+		cur := in.Receipts.Raw[i]
+		next := in.Receipts.Raw[i+1]
+		api.Uint32.AssertIsEqual(api.Uint32.Select(
+			api.Uint32.IsZero(c.TxGasCap[i-1]), // TxGasCap index is 1 less than receipt
+			api.Uint32.And(
+				api.Uint32.IsEqual(cur.BlockNum, next.BlockNum),
+				api.Uint32.IsEqual(cur.MptKeyPath, next.MptKeyPath)),
+			sdk.ConstUint32(1),
+		), sdk.ConstUint32(1))
+	}
+
+	curTxGas := sdk.ConstUint32(0)     // sum gas of the same tx
 	totalRebate := sdk.ConstUint248(0) // output, sum of rebate gas * gas price
 
 	for i := 0; i < MaxSwapNum; i++ {
-		r := in.Receipts.Raw[i+1] // first receipt is claimer so swap starts from 1 but TxGasCap starts from 0
 		// add swap to curTxGas
-		curTxGas = api.Uint248.Add(curTxGas, c.GasPerSwap)
+		curTxGas = api.Uint32.Add(curTxGas, c.GasPerSwap)
 		// now check TxGasCap, if 0, means more receipts belong to same tx
 		// if not 0, means last swap of tx, also add GasPerTx, and compare to TxGasCap, adds smaller one to totalRebate
-		lastSwap := api.Uint248.IsGreaterThan(c.TxGasCap[i], sdk.ConstUint248(0))
-		curTxGas = api.Uint248.Select(
+		lastSwap := api.Uint32.IsGreaterThan(c.TxGasCap[i], sdk.ConstUint32(0))
+		curTxGas = api.Uint32.Select(
 			lastSwap,
-			api.Uint248.Add(curTxGas, c.GasPerTx), // add fixed per tx gas
+			api.Uint32.Add(curTxGas, c.GasPerTx), // add fixed per tx gas
 			curTxGas,
 		)
+		// min(curTxGas, TxGasCap)
 		// no need to check lastSwap because if c.TxGasCap[i] is 0, toAdd is guaranteed to also be 0
-		toAdd := api.Uint248.Select(
-			api.Uint248.IsLessThan(curTxGas, c.TxGasCap[i]),
+		toAdd := api.Uint32.Select(
+			api.Uint32.IsLessThan(curTxGas, c.TxGasCap[i]),
 			curTxGas,
 			c.TxGasCap[i],
 		)
-		// multiple gas by gas fee and add to total, if not last swap, toAdd is 0 so no change
+
+		// first receipt is claimer so swap starts from 1 but TxGasCap starts from 0
+		r := in.Receipts.Raw[i+1]
+		// multiply gas by block base fee and add to total, if not last swap, toAdd is 0 so no change
 		// Note for dummy receipts, corresponding TxGasCap should all be 0 so toAdd is also 0
-		totalRebate = api.Uint248.Add(totalRebate, api.Uint248.Mul(toAdd, r.BlockBaseFee))
+		totalRebate = api.Uint248.Add(totalRebate, api.Uint248.Mul(api.ToUint248(toAdd), r.BlockBaseFee))
 		// if lastSwap, reset curTxGas to 0 for new tx next
-		curTxGas = api.Uint248.Select(
+		curTxGas = api.Uint32.Select(
 			lastSwap,
-			sdk.ConstUint248(0),
+			sdk.ConstUint32(0),
 			curTxGas,
 		)
 	}
@@ -149,14 +167,14 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 func DefaultCircuit() *GasCircuit {
 	ret := &GasCircuit{
 		PoolMgr:    sdk.ConstUint248(0),
-		GasPerSwap: sdk.ConstUint248(0),
-		GasPerTx:   sdk.ConstUint248(0),
+		GasPerSwap: sdk.ConstUint32(0),
+		GasPerTx:   sdk.ConstUint32(0),
 	}
 	for i := 0; i < MaxPoolNum*5; i++ {
 		ret.PoolKey[i] = zeroB32
 	}
 	for i := 0; i < MaxSwapNum; i++ {
-		ret.TxGasCap[i] = sdk.ConstUint248(0)
+		ret.TxGasCap[i] = sdk.ConstUint32(0)
 	}
 	return ret
 }

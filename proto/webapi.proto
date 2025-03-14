@@ -50,10 +50,11 @@ message CallData {
     repeated string app_circuit_outputs = 4; // each string is hex of []byte
 }
 
+// each field is hex of [32]byte
 message BrevisProofData {
     string commit_hash = 1;
-    string vk_hash = 2;
-    string app_commit_hash = 3;
-    string app_vk_hash = 4;
-    string smt_root = 5;
+    string app_commit_hash = 2;
+    string app_vk_hash = 3;
+    string smt_root = 4;
+    string dummy_input = 5;
 }

@@ -20,36 +20,39 @@ func (k *PoolKey) Scan(value interface{}) error {
 type CallData struct {
 	ProofIds          [][32]byte
 	Proof             []byte
-	ProofDataArray    []BrevisProofData
+	ProofDataArray    []ProofData
 	AppCircuitOutputs [][]byte
 }
 
 // convert to webapi.CallData
 func (d *CallData) ToWebCallData() *webapi.CallData {
 	ret := new(webapi.CallData)
-	ret.Proof = toHex(d.Proof)
+	ret.Proof = ToHex(d.Proof)
 	for _, p := range d.ProofIds {
-		ret.ProofIds = append(ret.ProofIds, toHex2(p))
+		ret.ProofIds = append(ret.ProofIds, ToHex(p))
 	}
 	for _, o := range d.AppCircuitOutputs {
-		ret.AppCircuitOutputs = append(ret.AppCircuitOutputs, toHex(o))
+		ret.AppCircuitOutputs = append(ret.AppCircuitOutputs, ToHex(o))
 	}
 	for _, d := range d.ProofDataArray {
 		ret.ProofDataArray = append(ret.ProofDataArray, &webapi.BrevisProofData{
-			CommitHash:    toHex2(d.CommitHash),
-			VkHash:        toHex2(d.VkHash),
-			AppCommitHash: toHex2(d.AppCommitHash),
-			AppVkHash:     toHex2(d.AppVkHash),
-			SmtRoot:       toHex2(d.SmtRoot),
+			CommitHash:    ToHex(d.CommitHash),
+			AppCommitHash: ToHex(d.AppCommitHash),
+			AppVkHash:     ToHex(d.AppVkHash),
+			SmtRoot:       ToHex(d.SmtRoot),
 		})
 	}
 	return ret
 }
 
-func toHex(b []byte) string {
-	return "0x" + hex.EncodeToString(b)
-}
-
-func toHex2(b [32]byte) string {
-	return "0x" + hex.EncodeToString(b[:])
+// []byte or fixed length array [32]byte or [20]byte, has 0x prefix
+func ToHex[T ~[]byte | ~[32]byte | ~[20]byte](input T) string {
+	switch v := any(input).(type) {
+	case []byte:
+		return "0x" + hex.EncodeToString(v)
+	case [20]byte:
+	case [32]byte:
+		return "0x" + hex.EncodeToString(v[:])
+	}
+	return ""
 }
