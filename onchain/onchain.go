@@ -2,17 +2,14 @@ package onchain
 
 import (
 	"context"
-	"encoding/hex"
 	"fmt"
 	"slices"
 	"time"
 
-	"github.com/brevis-network/brevis-sdk/sdk"
 	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/celer-network/goutils/eth/mon2"
-	"github.com/celer-network/goutils/log"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -45,50 +42,6 @@ type OneLog struct {
 // only valid for swap, return topics[1]
 func (o OneLog) PoolId() common.Hash {
 	return o.Topics[1]
-}
-
-// all needed for one circuit proof, supports multi pools
-type OneProveReq struct {
-	ChainId uint64
-	PoolMgr string
-	// circuit fields
-	GasPerSwap, GasPerTx uint32
-	// unique poolkeys from logs
-	PoolKey []binding.PoolKey
-
-	// circuit input receipts, first is claimer, rest are swaps
-	// all Swap logs have same sender, sorted by blknum
-	// swaps from same tx must be together (ok to re-order)
-	Logs []OneLog
-
-	// set by server
-	ReqId int64
-}
-
-func (r *OneProveReq) NewCircuit() *circuit.GasCircuit {
-	ret := circuit.DefaultCircuit()
-	ret.PoolMgr = sdk.ConstUint248(Hex2Bytes(r.PoolMgr))
-	ret.GasPerSwap = sdk.ConstUint32(r.GasPerSwap)
-	ret.GasPerTx = sdk.ConstUint32(r.GasPerTx)
-
-	if len(r.PoolKey) > circuit.MaxPoolNum {
-		// more pools than circuit can hadle
-		log.Warn(fmt.Sprintf("req %d has %d pools, more than MaxPoolNum %d", r.ReqId, len(r.PoolKey), circuit.MaxPoolNum))
-	}
-	for i, poolkey := range r.PoolKey {
-		idx := i * 5
-		// todo: break if idx > len(ret.PoolKey)
-		ret.PoolKey[idx] = sdk.ConstBytes32(poolkey.Currency0[:])
-		ret.PoolKey[idx+1] = sdk.ConstBytes32(poolkey.Currency1[:])
-		ret.PoolKey[idx+2] = sdk.ConstBytes32(poolkey.Fee.Bytes())
-		ret.PoolKey[idx+3] = sdk.ConstBytes32(poolkey.TickSpacing.Bytes())
-		ret.PoolKey[idx+4] = sdk.ConstBytes32(poolkey.Hooks[:])
-	}
-	// skip first Claim ev
-	for i, swap := range r.Logs[1:] {
-		ret.TxGasCap[i] = sdk.ConstUint32(swap.TxGasCap)
-	}
-	return ret
 }
 
 // return err if dial fail or chainid mismatch
@@ -125,48 +78,6 @@ func NewOneChain(cfg *OneChainConfig, dal *dal.DAL) (*OneChain, error) {
 
 func (c *OneChain) Close() {
 	c.mon.Close()
-}
-
-func (c *OneChain) MonPoolInit() {
-	pmAddr := Hex2addr(c.PoolMgr)
-	filter, _ := binding.NewPoolMgrFilterer(pmAddr, c.ec)
-	go c.mon.MonAddr(mon2.PerAddrCfg{
-		Addr:    pmAddr,
-		ChkIntv: GetLogIntv,
-		AbiStr:  binding.PoolMgrMetaData.ABI,
-		Topics:  [][]common.Hash{{Hex2hash(PoolInitEvId)}}, // binpool Initialize event id to reduce log data
-	}, func(s string, l types.Log) {
-		if s != "Initialize" {
-			log.Error("wrong event: ", s)
-			return
-		}
-		initEv, err := filter.ParseInitialize(l)
-		if err != nil {
-			log.Error("parse log err: ", err)
-			return
-		}
-		// skip zero hook pools
-		if initEv.Hooks == ZeroAddr {
-			return
-		}
-		poolid := Hash2Hex(initEv.Id)
-		poolK := binding.PoolKey{
-			Currency0:   initEv.Currency0,
-			Currency1:   initEv.Currency1,
-			Fee:         initEv.Fee,
-			TickSpacing: initEv.TickSpacing,
-			Hooks:       initEv.Hooks,
-		}
-		log.Infoln("add pool", poolid)
-		err = c.db.PoolAdd(context.Background(), dal.PoolAddParams{
-			Chid:    c.ChainID,
-			Poolid:  poolid,
-			Poolkey: poolK,
-		})
-		if err != nil {
-			log.Errorln("pooladd err:", err)
-		}
-	})
 }
 
 // txlist is hex string of tx hash, return non-nil err if any TransactionReceipt has err
@@ -208,6 +119,14 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string)
 	pmAddr := Hex2addr(c.PoolMgr)
 	swapEvId := Hex2hash(SwapEvId)
 	sender := c.FindSender(receipts, poolidMap)
+	claimev, err := c.db.ClaimerGet(context.Background(), dal.ClaimerGetParams{
+		Chid:   c.ChainID,
+		Router: Addr2hex(sender),
+	})
+	found, _ := dal.ChkQueryRow(err)
+	if !found {
+		return nil, fmt.Errorf("please contact Brevis team for proper setup of %s", sender)
+	}
 
 	// go over tx receipts to filter eligible Swap logs
 	var logs []OneLog
@@ -248,7 +167,7 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string)
 
 	// go over logs, and keep track of unique poolids and count, if exceeds MaxSwaps or MaxPoolNum, creates NewOneProveReq
 	var proveReqs []*OneProveReq
-	curReq := c.NewOneProveReq()
+	curReq := c.NewOneProveReq(&claimev.Raw)
 	curPoolMap := make(PoolIdMap) // unique poolids in current req
 	for _, one := range GroupSwapsByBlock(logs) {
 		// swaps includes logs and map of poolid, if within limit, add to curReq
@@ -262,7 +181,7 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string)
 				curReq.PoolKey = append(curReq.PoolKey, poolidMap[k])
 			}
 			proveReqs = append(proveReqs, curReq)
-			curReq = c.NewOneProveReq()
+			curReq = c.NewOneProveReq(&claimev.Raw)
 			curPoolMap = make(PoolIdMap)
 			curReq.Logs = append(curReq.Logs, one.Logs...)
 			curPoolMap.Merge(one.PoolIds)
@@ -287,41 +206,15 @@ func (c *OneChain) FindSender(receipts []*types.Receipt, poolids map[common.Hash
 	return ZeroAddr
 }
 
-func (c *OneChain) NewOneProveReq() *OneProveReq {
+func (c *OneChain) NewOneProveReq(claimev *types.Log) *OneProveReq {
 	return &OneProveReq{
 		ChainId:    c.ChainID,
 		GasPerSwap: c.GasPerSwap,
 		GasPerTx:   c.GasPerTx,
 		PoolMgr:    c.PoolMgr,
+		Logs: []OneLog{OneLog{
+			Log:          claimev,
+			LogIdxOffset: claimev.Index,
+		}},
 	}
-}
-
-func Hex2addr(addr string) common.Address {
-	return common.HexToAddress(addr)
-}
-
-// 0x prefix, only hex, all lower case
-func Addr2hex(addr common.Address) string {
-	return "0x" + hex.EncodeToString(addr[:])
-}
-
-func Hex2hash(hexstr string) common.Hash {
-	return common.HexToHash(hexstr)
-}
-
-func Hash2Hex(h common.Hash) string {
-	return "0x" + hex.EncodeToString(h[:])
-}
-
-// ===== utils =====
-func Hex2Bytes(s string) (b []byte) {
-	if len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
-		s = s[2:]
-	}
-	// hex.DecodeString expects an even-length string
-	if len(s)%2 == 1 {
-		s = "0" + s
-	}
-	b, _ = hex.DecodeString(s)
-	return b
 }

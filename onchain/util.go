@@ -1,7 +1,9 @@
 package onchain
 
 import (
-	"sort"
+	"encoding/hex"
+
+	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -48,13 +50,41 @@ func GroupSwapsByBlock(in []OneLog) (ret []SameBlkSwaps) {
 	for k := range m {
 		keys = append(keys, k)
 	}
-	sort.Slice(keys, func(i, j int) bool {
-		return keys[i] < keys[j]
-	})
+	slices.Sort(keys)
 	for _, k := range keys {
 		ret = append(ret, m[k])
 	}
 	return ret
+}
+
+func Hex2addr(addr string) common.Address {
+	return common.HexToAddress(addr)
+}
+
+// 0x prefix, only hex, all lower case
+func Addr2hex(addr common.Address) string {
+	return "0x" + hex.EncodeToString(addr[:])
+}
+
+func Hex2hash(hexstr string) common.Hash {
+	return common.HexToHash(hexstr)
+}
+
+func Hash2Hex(h common.Hash) string {
+	return "0x" + hex.EncodeToString(h[:])
+}
+
+// ===== utils =====
+func Hex2Bytes(s string) (b []byte) {
+	if len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
+		s = s[2:]
+	}
+	// hex.DecodeString expects an even-length string
+	if len(s)%2 == 1 {
+		s = "0" + s
+	}
+	b, _ = hex.DecodeString(s)
+	return b
 }
 
 // SplitMapIntoBatches splits a map[K]V into batches based on maxKeys and maxItems constraints

@@ -9,6 +9,12 @@ import (
 	"github.com/brevis-network/uniswap-rebate/webapi"
 )
 
+type Claimer struct {
+	Chid   uint64                   `json:"chid"`
+	Router string                   `json:"router"`
+	Evlog  binding.ClaimHelpClaimer `json:"evlog"`
+}
+
 type Monitor struct {
 	Key    string `json:"key"`
 	Blknum uint64 `json:"blknum"`

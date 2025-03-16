@@ -12,6 +12,37 @@ import (
 	"github.com/brevis-network/uniswap-rebate/webapi"
 )
 
+const claimerAdd = `-- name: ClaimerAdd :exec
+INSERT INTO claimer (chid, router, evlog) VALUES ($1, $2, $3)
+`
+
+type ClaimerAddParams struct {
+	Chid   uint64                   `json:"chid"`
+	Router string                   `json:"router"`
+	Evlog  binding.ClaimHelpClaimer `json:"evlog"`
+}
+
+func (q *Queries) ClaimerAdd(ctx context.Context, arg ClaimerAddParams) error {
+	_, err := q.db.ExecContext(ctx, claimerAdd, arg.Chid, arg.Router, arg.Evlog)
+	return err
+}
+
+const claimerGet = `-- name: ClaimerGet :one
+SELECT evlog FROM claimer WHERE chid = $1 and router = $2
+`
+
+type ClaimerGetParams struct {
+	Chid   uint64 `json:"chid"`
+	Router string `json:"router"`
+}
+
+func (q *Queries) ClaimerGet(ctx context.Context, arg ClaimerGetParams) (binding.ClaimHelpClaimer, error) {
+	row := q.db.QueryRowContext(ctx, claimerGet, arg.Chid, arg.Router)
+	var evlog binding.ClaimHelpClaimer
+	err := row.Scan(&evlog)
+	return evlog, err
+}
+
 const monGet = `-- name: MonGet :one
 SELECT key, blknum, blkidx FROM monitor WHERE key = $1
 `

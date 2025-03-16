@@ -20,4 +20,8 @@ overrides:
     column: "reqs.calldata"
   - go_type: "*github.com/brevis-network/uniswap-rebate/webapi.NewProofReq"
     column: "reqs.proofreq"
+  - go_type: "uint64"
+    column: "claimer.chid"
+  - go_type: "github.com/brevis-network/uniswap-rebate/binding.ClaimHelpClaimer"
+    column: "claimer.evlog"
   

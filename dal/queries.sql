@@ -19,3 +19,9 @@ INSERT INTO reqs (id, proofreq) VALUES ($1, $2);
 
 -- name: ReqGet :one
 SELECT * FROM reqs WHERE id = $1;
+
+-- name: ClaimerAdd :exec
+INSERT INTO claimer (chid, router, evlog) VALUES ($1, $2, $3);
+
+-- name: ClaimerGet :one
+SELECT evlog FROM claimer WHERE chid = $1 and router = $2;

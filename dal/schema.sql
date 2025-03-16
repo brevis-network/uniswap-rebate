@@ -3,6 +3,14 @@ CREATE USER unirebate;
 GRANT ALL ON DATABASE unirebate TO unirebate;
 SET DATABASE TO unirebate;
 
+-- due to router only has view func we have to deploy helper contract to emit Claimer event
+CREATE TABLE IF NOT EXISTS claimer (
+    chid BIGINT NOT NULL, -- chainid
+    router TEXT NOT NULL,  -- 0x... router address
+    evlog JSONB NOT NULL, -- ClaimHelpClaimer struct (not types.Log b/c we need to add Value/Scan)
+    UNIQUE (chid, router) -- ensure no duplicated router on same chain, audo-create index
+);
+
 -- poolid, poolkey non-mutable once add. only add if poolkey.hooks isn't zero
 CREATE TABLE IF NOT EXISTS pools (
     chid BIGINT NOT NULL, -- chainid

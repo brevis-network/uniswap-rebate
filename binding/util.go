@@ -16,6 +16,14 @@ func (k *PoolKey) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), k)
 }
 
+func (k ClaimHelpClaimer) Value() (driver.Value, error) {
+	return json.Marshal(k)
+}
+
+func (k *ClaimHelpClaimer) Scan(value interface{}) error {
+	return json.Unmarshal(value.([]byte), k)
+}
+
 // to be saved in db. fields are args for ClaimWithZkProofs
 type CallData struct {
 	ProofIds          [][32]byte
