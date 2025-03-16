@@ -53,8 +53,12 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	for i := 0; i < MaxPoolNum; i++ {
 		// check hook isn't zero
 		idx := i * 5 // idx of first slot (of total 5)
-		api.Uint248.AssertIsDifferent(api.ToUint248(c.PoolKey[idx+4]), sdk.ConstUint248(0))
-		poolIDs[i] = api.Keccak256(c.PoolKey[idx:idx+5], []int32{256, 256, 256, 256, 256})
+		// if hook is 0, set poolid to 0, otherwise, hash 5 fields
+		poolIDs[i] = api.Bytes32.Select(
+			api.Bytes32.IsZero(c.PoolKey[idx+4]),
+			zeroB32,
+			api.Keccak256(c.PoolKey[idx:idx+5], []int32{256, 256, 256, 256, 256}),
+		)
 	}
 
 	// check first receipt is Claimer

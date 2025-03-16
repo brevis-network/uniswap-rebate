@@ -5,7 +5,7 @@ SET DATABASE TO unirebate;
 
 -- poolid, poolkey non-mutable once add. only add if poolkey.hooks isn't zero
 CREATE TABLE IF NOT EXISTS pools (
-    chid BIGINT NOT NULL DEFAULT 1, -- only 1 for uniswap case
+    chid BIGINT NOT NULL, -- chainid
     poolid TEXT NOT NULL,  -- 0x...
     poolkey JSONB NOT NULL, -- PoolKey struct that initialized this pool. poolid is hash of PoolKey
     UNIQUE (chid, poolid) -- ensure no duplicated pool on same chain, audo-create index

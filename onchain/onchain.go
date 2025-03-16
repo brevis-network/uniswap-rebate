@@ -4,8 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"math/big"
-	"sort"
+	"slices"
 	"time"
 
 	"github.com/brevis-network/brevis-sdk/sdk"
@@ -38,55 +37,57 @@ type OneChain struct {
 }
 
 type OneLog struct {
-	Swap         *types.Log
+	*types.Log   // may also be Claimer event
 	LogIdxOffset uint
+	TxGasCap     uint32 // tx gas * 0.8. if 0, means next swap is from same tx
 }
 
-type OneBlock struct {
-	BaseFee   uint64
-	SlotValue [32]byte
+// only valid for swap, return topics[1]
+func (o OneLog) PoolId() common.Hash {
+	return o.Topics[1]
 }
 
 // all needed for one circuit proof, supports multi pools
 type OneProveReq struct {
-	ChainId, GasPerSwap     uint64
-	PoolMgr, Sender, Oracle string
-	// unique poolids from logs
-	PoolIds []string
-	// all logs have same sender, sorted by blknum
+	ChainId uint64
+	PoolMgr string
+	// circuit fields
+	GasPerSwap, GasPerTx uint32
+	// unique poolkeys from logs
+	PoolKey []binding.PoolKey
+
+	// circuit input receipts, first is claimer, rest are swaps
+	// all Swap logs have same sender, sorted by blknum
+	// swaps from same tx must be together (ok to re-order)
 	Logs []OneLog
-	// blknum -> info about at this block, include all blocknums from Logs
-	Blks map[uint64]OneBlock
 
 	// set by server
 	ReqId int64
 }
 
-// sort logs and populate Blks from m
-func (r *OneProveReq) Fix(m map[uint64]OneBlock) {
-	sort.Slice(r.Logs, func(i, j int) bool {
-		return r.Logs[i].Swap.BlockNumber < r.Logs[j].Swap.BlockNumber
-	})
-	for _, l := range r.Logs {
-		// ok to set again as it's same anyway
-		r.Blks[l.Swap.BlockNumber] = m[l.Swap.BlockNumber]
-	}
-}
-
 func (r *OneProveReq) NewCircuit() *circuit.GasCircuit {
-	ret := &circuit.GasCircuit{
-		PoolMgr:    sdk.ConstUint248(Hex2Bytes(r.PoolMgr)),
-		Sender:     sdk.ConstUint248(Hex2Bytes(r.Sender)),
-		GasPerSwap: sdk.ConstUint248(r.GasPerSwap),
+	ret := circuit.DefaultCircuit()
+	ret.PoolMgr = sdk.ConstUint248(Hex2Bytes(r.PoolMgr))
+	ret.GasPerSwap = sdk.ConstUint32(r.GasPerSwap)
+	ret.GasPerTx = sdk.ConstUint32(r.GasPerTx)
+
+	if len(r.PoolKey) > circuit.MaxPoolNum {
+		// more pools than circuit can hadle
+		log.Warn(fmt.Sprintf("req %d has %d pools, more than MaxPoolNum %d", r.ReqId, len(r.PoolKey), circuit.MaxPoolNum))
 	}
-	/*
-		for i, pid := range r.PoolIds {
-			ret.PoolId[i] = sdk.ConstBytes32(Hex2Bytes(pid))
-		}
-		for i := len(r.PoolIds); i < circuit.MaxPoolNum; i++ {
-			ret.PoolId[i] = sdk.ConstBytes32([]byte{0})
-		}
-	*/
+	for i, poolkey := range r.PoolKey {
+		idx := i * 5
+		// todo: break if idx > len(ret.PoolKey)
+		ret.PoolKey[idx] = sdk.ConstBytes32(poolkey.Currency0[:])
+		ret.PoolKey[idx+1] = sdk.ConstBytes32(poolkey.Currency1[:])
+		ret.PoolKey[idx+2] = sdk.ConstBytes32(poolkey.Fee.Bytes())
+		ret.PoolKey[idx+3] = sdk.ConstBytes32(poolkey.TickSpacing.Bytes())
+		ret.PoolKey[idx+4] = sdk.ConstBytes32(poolkey.Hooks[:])
+	}
+	// skip first Claim ev
+	for i, swap := range r.Logs[1:] {
+		ret.TxGasCap[i] = sdk.ConstUint32(swap.TxGasCap)
+	}
 	return ret
 }
 
@@ -158,6 +159,7 @@ func (c *OneChain) MonPoolInit() {
 		}
 		log.Infoln("add pool", poolid)
 		err = c.db.PoolAdd(context.Background(), dal.PoolAddParams{
+			Chid:    c.ChainID,
 			Poolid:  poolid,
 			Poolkey: poolK,
 		})
@@ -168,6 +170,7 @@ func (c *OneChain) MonPoolInit() {
 }
 
 // txlist is hex string of tx hash, return non-nil err if any TransactionReceipt has err
+// receipts are sorted by blocknum and index ascending
 func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 	var ret []*types.Receipt
 	for _, tx := range txlist {
@@ -177,115 +180,119 @@ func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 		}
 		ret = append(ret, r)
 	}
+	// sort by BlockNum and index ascending
+	slices.SortFunc(ret, func(a, b *types.Receipt) int {
+		blockNumCmp := a.BlockNumber.Cmp(b.BlockNumber)
+		if blockNumCmp != 0 {
+			return blockNumCmp
+		}
+		if a.TransactionIndex < b.TransactionIndex {
+			return -1
+		} else if a.TransactionIndex > b.TransactionIndex {
+			return 1
+		}
+		return 0
+	})
 	return ret, nil
 }
 
 // go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr)
-// fetch block basefee and storage, return ready to use start prove reqs
+// each prove req can have at most MaxSwap or MaxPoolNum whichever hits first
 func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string) ([]*OneProveReq, error) {
-	poolids, _ := c.db.PoolIds(context.Background())
-	// if onlyPids is empty, allow all eligible, otherwise, must be both in onlyPids and in db
-	poolidMap := make(map[[32]byte]bool)
-	if len(onlyPids) == 0 {
-		for _, pid := range poolids {
-			poolidMap[Hex2hash(pid)] = true
-		}
-	} else {
-		// intersection of onlyPids and poolids from db
-		onlyMap := make(map[[32]byte]bool)
-		for _, pid := range onlyPids {
-			onlyMap[Hex2hash(pid)] = true
-		}
-		for _, pid := range poolids {
-			pidh := Hex2hash(pid)
-			if onlyMap[pidh] {
-				poolidMap[pidh] = true
-			}
-		}
+	rows, _ := c.db.Pools(context.Background(), c.ChainID)
+	poolidMap := make(map[common.Hash]binding.PoolKey)
+	for _, row := range rows {
+		poolidMap[Hex2hash(row.Poolid)] = row.Poolkey
 	}
 
-	// poolid to list of entries
-	logByPool := make(map[[32]byte][]OneLog)
 	pmAddr := Hex2addr(c.PoolMgr)
-	oracle := Hex2addr(c.Oracle)
 	swapEvId := Hex2hash(SwapEvId)
-	var sender common.Address // default zero addr, will be set from first eligible log
+	sender := c.FindSender(receipts, poolidMap)
 
-	blkMap := make(map[uint64]OneBlock)
+	// go over tx receipts to filter eligible Swap logs
+	var logs []OneLog
 	for _, r := range receipts {
 		// all logs in one receipt has same logIdxOffset
 		logIdxOffset := r.Logs[0].Index
+		hasAppend := false // for this receipt, whether we have appended OneLog to logs, if true we need to set last OneLog TxGasCap
 		for _, l := range r.Logs {
 			if l.Address == pmAddr && l.Topics[0] == swapEvId {
 				poolid := l.Topics[1]
-				if !poolidMap[poolid] {
+				if _, ok := poolidMap[poolid]; !ok {
 					// skip ineligible poolids
 					continue
 				}
 				// first eligible log, set sender
 				logSender := common.BytesToAddress(l.Topics[2][12:])
-				if sender == ZeroAddr {
-					sender = logSender
-				} else if sender != logSender {
+				if sender != logSender {
 					// skip if sender already set but logSender is different
 					continue
 				}
-				// now append log to correct list
-				logByPool[poolid] = append(logByPool[poolid], OneLog{
-					Swap:         l,
+				hasAppend = true
+				logs = append(logs, OneLog{
+					Log:          l,
 					LogIdxOffset: logIdxOffset,
+					// TxGasCap default 0
 				})
-				// new blocknum, we could make the map at OneChain level or save to db as info is immutable
-				if _, ok := blkMap[l.BlockNumber]; !ok {
-					// get basefee and slot
-					blkNum := new(big.Int).SetUint64(l.BlockNumber)
-					b, err := c.ec.BlockByNumber(context.Background(), blkNum)
-					if err != nil {
-						log.Errorln("get block", l.BlockNumber, "err:", err)
-						continue
-					}
-					value, err := c.ec.StorageAt(context.Background(), oracle, ZeroHash, blkNum)
-					if err != nil {
-						log.Errorln("StorageAt", l.BlockNumber, oracle, "err:", err)
-						continue
-					}
-					var slotV common.Hash
-					copy(slotV[32-len(value):], value)
-					blkMap[l.BlockNumber] = OneBlock{
-						BaseFee:   b.BaseFee().Uint64(),
-						SlotValue: slotV,
-					}
-				}
 			}
+		}
+		if hasAppend { // set last log.TxGasCap of this receipt
+			logs[len(logs)-1].TxGasCap = uint32(r.GasUsed * 80 / 100) // actual gas * 0.8
 		}
 	}
 
-	// OneProveReq supports up to MaxReceipts and MaxPoolNum
-	// so we need to split into multiple requests if logByPool has more
-	// use simple algo for now
+	// Circuit supports up to MaxSwaps and MaxPoolNum
+	// so we need to split into multiple requests if logs has more. Note we have to keep all swaps exactly ordered as onchain de-dup is by blknum
+	// all swaps happen in same blk must be in one batch, so if MaxPool is 32 and within one block there are swaps touching more than 32 pools
+	// 33rd pool swaps will have no effect as circuit poolid check will return 0
+
+	// go over logs, and keep track of unique poolids and count, if exceeds MaxSwaps or MaxPoolNum, creates NewOneProveReq
 	var proveReqs []*OneProveReq
-	for _, b := range SplitMapIntoBatches(logByPool, circuit.MaxPoolNum, circuit.MaxReceipts) {
-		// one b has up to limit pools and logs
-		req := c.NewOneProveReq(sender)
-		for k, v := range b {
-			req.PoolIds = append(req.PoolIds, Hash2Hex(k))
-			req.Logs = append(req.Logs, v...)
+	curReq := c.NewOneProveReq()
+	curPoolMap := make(PoolIdMap) // unique poolids in current req
+	for _, one := range GroupSwapsByBlock(logs) {
+		// swaps includes logs and map of poolid, if within limit, add to curReq
+		if len(curReq.Logs)+len(one.Logs) <= circuit.MaxSwapNum &&
+			curPoolMap.CombineCount(one.PoolIds) <= circuit.MaxPoolNum {
+			curReq.Logs = append(curReq.Logs, one.Logs...)
+			curPoolMap.Merge(one.PoolIds)
+		} else {
+			// can't fit, need to create new req, but first populate req.PoolKey
+			for k := range curPoolMap {
+				curReq.PoolKey = append(curReq.PoolKey, poolidMap[k])
+			}
+			proveReqs = append(proveReqs, curReq)
+			curReq = c.NewOneProveReq()
+			curPoolMap = make(PoolIdMap)
+			curReq.Logs = append(curReq.Logs, one.Logs...)
+			curPoolMap.Merge(one.PoolIds)
 		}
-		req.Fix(blkMap)
-		proveReqs = append(proveReqs, req)
 	}
 	return proveReqs, nil
 }
 
-func (c *OneChain) NewOneProveReq(sender common.Address, pools ...string) *OneProveReq {
+// return first eligible swap sender. otherwise return zeroAddr
+func (c *OneChain) FindSender(receipts []*types.Receipt, poolids map[common.Hash]binding.PoolKey) common.Address {
+	pmAddr := Hex2addr(c.PoolMgr)
+	swapEvId := Hex2hash(SwapEvId)
+	for _, r := range receipts {
+		for _, l := range r.Logs {
+			if l.Address == pmAddr && l.Topics[0] == swapEvId {
+				if _, ok := poolids[l.Topics[1]]; ok {
+					return common.BytesToAddress(l.Topics[2][12:])
+				}
+			}
+		}
+	}
+	return ZeroAddr
+}
+
+func (c *OneChain) NewOneProveReq() *OneProveReq {
 	return &OneProveReq{
 		ChainId:    c.ChainID,
 		GasPerSwap: c.GasPerSwap,
+		GasPerTx:   c.GasPerTx,
 		PoolMgr:    c.PoolMgr,
-		Sender:     Addr2hex(sender),
-		Oracle:     c.Oracle,
-		PoolIds:    pools,
-		Blks:       make(map[uint64]OneBlock),
 	}
 }
 
@@ -302,7 +309,7 @@ func Hex2hash(hexstr string) common.Hash {
 	return common.HexToHash(hexstr)
 }
 
-func Hash2Hex(h [32]byte) string {
+func Hash2Hex(h common.Hash) string {
 	return "0x" + hex.EncodeToString(h[:])
 }
 

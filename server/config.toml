@@ -13,5 +13,4 @@ BlkDelay = 2
 
 GasPerSwap = 80000
 PoolMgr = "0x8C4BcBE6b9eF47855f97E675296FA3F6fafa5F1A"
-Oracle = "0xc8caf3c1d76d264b6d5d511d883b58b3874eafa0"
 VkHash = ""
