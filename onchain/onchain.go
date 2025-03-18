@@ -3,6 +3,7 @@ package onchain
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"slices"
 	"time"
 
@@ -169,7 +170,16 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string)
 	var proveReqs []*OneProveReq
 	curReq := c.NewOneProveReq(&claimev.Raw)
 	curPoolMap := make(PoolIdMap) // unique poolids in current req
-	for _, one := range GroupSwapsByBlock(logs) {
+	// blkNums is sorted ascending
+	blkNums, blk2swaps := SwapsByBlock(logs)
+	for _, blknum := range blkNums {
+		// pupulate curReq blk map
+		block, _ := c.ec.BlockByNumber(context.Background(), new(big.Int).SetUint64(blknum))
+		curReq.Blks[blknum] = OneBlock{
+			BaseFee:   block.BaseFee().Uint64(),
+			Timestamp: block.Time(),
+		}
+		one := blk2swaps[blknum]
 		// swaps includes logs and map of poolid, if within limit, add to curReq
 		if len(curReq.Logs)+len(one.Logs) <= circuit.MaxSwapNum &&
 			curPoolMap.CombineCount(one.PoolIds) <= circuit.MaxPoolNum {
@@ -212,9 +222,10 @@ func (c *OneChain) NewOneProveReq(claimev *types.Log) *OneProveReq {
 		GasPerSwap: c.GasPerSwap,
 		GasPerTx:   c.GasPerTx,
 		PoolMgr:    c.PoolMgr,
-		Logs: []OneLog{OneLog{
+		Logs: []OneLog{{
 			Log:          claimev,
 			LogIdxOffset: claimev.Index,
 		}},
+		Blks: make(map[uint64]OneBlock),
 	}
 }

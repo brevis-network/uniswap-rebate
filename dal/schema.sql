@@ -21,10 +21,12 @@ CREATE TABLE IF NOT EXISTS pools (
 
 CREATE TABLE IF NOT EXISTS reqs (
     id BIGINT PRIMARY KEY, -- epoch seconds when requested
+    router TEXT NOT NULL, -- sender of first eligible swap, not required for function but help w/ debugging/support
     step INT NOT NULL DEFAULT 0, -- 0: fetching tx receipts done 1: started app circuit proof 2: has app proof, sent to Brevis gw for final proof 3: have data ready to submit
     proofreq JSONB NOT NULL, -- webapi.NewProofReq
     calldata JSONB -- only not null if step is 3 (received ready to send onchain data from Brevis gw)
 );
+CREATE INDEX IF NOT EXISTS reqs_router on reqs (router);
 
 -- persist block num/index to resume when restart, key is chid-addr
 CREATE TABLE IF NOT EXISTS monitor (

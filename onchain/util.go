@@ -2,7 +2,6 @@ package onchain
 
 import (
 	"encoding/hex"
-
 	"slices"
 
 	"github.com/ethereum/go-ethereum/common"
@@ -34,8 +33,9 @@ type SameBlkSwaps struct {
 	PoolIds PoolIdMap
 }
 
-// group OneLog by swap blocknum also return unique poolids for each group
-func GroupSwapsByBlock(in []OneLog) (ret []SameBlkSwaps) {
+// group OneLog by swap blocknum including unique poolids for each group
+// also return sorted blknum for ordered iter
+func SwapsByBlock(in []OneLog) ([]uint64, map[uint64]SameBlkSwaps) {
 	m := make(map[uint64]SameBlkSwaps)
 	for _, l := range in {
 		ssb := m[l.BlockNumber]
@@ -45,16 +45,12 @@ func GroupSwapsByBlock(in []OneLog) (ret []SameBlkSwaps) {
 		}
 		ssb.PoolIds[l.PoolId()] = true
 	}
-
 	keys := make([]uint64, 0, len(m))
 	for k := range m {
 		keys = append(keys, k)
 	}
 	slices.Sort(keys)
-	for _, k := range keys {
-		ret = append(ret, m[k])
-	}
-	return ret
+	return keys, m
 }
 
 func Hex2addr(addr string) common.Address {

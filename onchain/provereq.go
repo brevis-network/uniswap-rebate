@@ -9,6 +9,11 @@ import (
 	"github.com/celer-network/goutils/log"
 )
 
+// block basefee and timestamp
+type OneBlock struct {
+	BaseFee, Timestamp uint64
+}
+
 // all needed for one circuit proof, supports multi pools
 type OneProveReq struct {
 	ChainId uint64
@@ -23,6 +28,8 @@ type OneProveReq struct {
 	// swaps from same tx must be together (ok to re-order)
 	Logs []OneLog
 
+	// blknum -> info about at this block, needed when build sdk.ReceiptData
+	Blks map[uint64]OneBlock
 	// set by server
 	ReqId int64
 }
@@ -41,11 +48,11 @@ func (r *OneProveReq) NewCircuit() *circuit.GasCircuit {
 	for i, poolkey := range r.PoolKey {
 		idx := i * 5
 		// todo: break if idx > len(ret.PoolKey)
-		ret.PoolKey[idx] = sdk.ConstBytes32(poolkey.Currency0[:])
-		ret.PoolKey[idx+1] = sdk.ConstBytes32(poolkey.Currency1[:])
-		ret.PoolKey[idx+2] = sdk.ConstBytes32(poolkey.Fee.Bytes())
-		ret.PoolKey[idx+3] = sdk.ConstBytes32(poolkey.TickSpacing.Bytes())
-		ret.PoolKey[idx+4] = sdk.ConstBytes32(poolkey.Hooks[:])
+		ret.PoolKey[idx] = sdk.ConstFromBigEndianBytes(poolkey.Currency0[:])
+		ret.PoolKey[idx+1] = sdk.ConstFromBigEndianBytes(poolkey.Currency1[:])
+		ret.PoolKey[idx+2] = sdk.ConstFromBigEndianBytes(poolkey.Fee.Bytes())
+		ret.PoolKey[idx+3] = sdk.ConstFromBigEndianBytes(poolkey.TickSpacing.Bytes())
+		ret.PoolKey[idx+4] = sdk.ConstFromBigEndianBytes(poolkey.Hooks[:])
 	}
 	// skip first Claim ev
 	for i, swap := range r.Logs[1:] {

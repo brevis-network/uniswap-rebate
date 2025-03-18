@@ -24,7 +24,7 @@ var (
 	// all swaps of same router
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
 	// const
-	zeroB32 = sdk.ConstBytes32([]byte{0})
+	zeroB32 = sdk.ConstFromBigEndianBytes([]byte{0})
 )
 
 type GasCircuit struct {
@@ -50,7 +50,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 
 	// check pool has non-zero hook and compute poolID, solidity in memory struct doesn't do packing so each field occupies 32bytes
 	var poolIDs [MaxPoolNum]sdk.Bytes32
-	for i := 0; i < MaxPoolNum; i++ {
+	for i := range MaxPoolNum {
 		// check hook isn't zero
 		idx := i * 5 // idx of first slot (of total 5)
 		// if hook is 0, set poolid to 0, otherwise, hash 5 fields
@@ -81,7 +81,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 			api.Uint248.IsEqual(api.ToUint248(r.Fields[1].Value), router),
 		)
 		eligible := sdk.ConstUint32(0) // check event poolid with all poolids
-		for j := 0; j < MaxPoolNum; j++ {
+		for j := range MaxPoolNum {
 			// if event poolid matches poolid, set eligiblePoolId to 1, otherwise keep as is
 			eligible = api.Uint32.Select(
 				sdk.Uint32{Val: api.Bytes32.IsEqual(poolIDs[j], r.Fields[0].Value).Val},
@@ -109,7 +109,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	curTxGas := sdk.ConstUint32(0)     // sum gas of the same tx
 	totalRebate := sdk.ConstUint248(0) // output, sum of rebate gas * gas price
 
-	for i := 0; i < MaxSwapNum; i++ {
+	for i := range MaxSwapNum {
 		// add swap to curTxGas
 		curTxGas = api.Uint32.Add(curTxGas, c.GasPerSwap)
 		// now check TxGasCap, if 0, means more receipts belong to same tx
@@ -174,10 +174,10 @@ func DefaultCircuit() *GasCircuit {
 		GasPerSwap: sdk.ConstUint32(0),
 		GasPerTx:   sdk.ConstUint32(0),
 	}
-	for i := 0; i < MaxPoolNum*5; i++ {
+	for i := range MaxPoolNum * 5 {
 		ret.PoolKey[i] = zeroB32
 	}
-	for i := 0; i < MaxSwapNum; i++ {
+	for i := range MaxSwapNum {
 		ret.TxGasCap[i] = sdk.ConstUint32(0)
 	}
 	return ret

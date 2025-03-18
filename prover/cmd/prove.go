@@ -174,17 +174,17 @@ func DoOneReq(r *onchain.OneProveReq, batchIdx int) (*gwproto.Query, error) {
 	}, nil
 }
 
-func OneLog2SdkReceipt(l onchain.OneLog, basefee uint64) sdk.ReceiptData {
-	swap := l.Swap
+func OneLog2SdkReceipt(swap onchain.OneLog, basefee, timestamp uint64) sdk.ReceiptData {
 	ret := sdk.ReceiptData{
-		BlockNum:     new(big.Int).SetUint64(swap.BlockNumber),
-		BlockBaseFee: new(big.Int).SetUint64(basefee),
-		TxHash:       swap.TxHash,
-		MptKeyPath:   TxIdx2MptPath(swap.TxIndex),
+		BlockNum:       new(big.Int).SetUint64(swap.BlockNumber),
+		BlockBaseFee:   new(big.Int).SetUint64(basefee),
+		BlockTimestamp: timestamp,
+		TxHash:         swap.TxHash,
+		MptKeyPath:     TxIdx2MptPath(swap.TxIndex),
 	}
 	ret.Fields[0] = sdk.LogFieldData{
 		Contract:   swap.Address,
-		LogPos:     swap.Index - l.LogIdxOffset,
+		LogPos:     swap.Index - swap.LogIdxOffset,
 		EventID:    swap.Topics[0],
 		IsTopic:    true,
 		FieldIndex: 1,
@@ -192,7 +192,7 @@ func OneLog2SdkReceipt(l onchain.OneLog, basefee uint64) sdk.ReceiptData {
 	}
 	ret.Fields[1] = sdk.LogFieldData{
 		Contract:   swap.Address,
-		LogPos:     swap.Index - l.LogIdxOffset,
+		LogPos:     swap.Index - swap.LogIdxOffset,
 		EventID:    swap.Topics[0],
 		IsTopic:    true,
 		FieldIndex: 2,

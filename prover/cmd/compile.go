@@ -19,9 +19,10 @@ var compileCmd = &cobra.Command{
 	Use:   "compile",
 	Short: "sdk.Compile circuit",
 	Run: func(cmd *cobra.Command, args []string) {
+		app, err := sdk.NewBrevisApp(1, "", outDir)
 		appCircuit := circuit.DefaultCircuit()
 
-		_, _, _, vkhash, err := sdk.Compile(appCircuit, outDir, srsDir)
+		_, _, _, vkhash, err := sdk.Compile(appCircuit, outDir, srsDir, app)
 		if err != nil {
 			log.Error("sdk.Compile err:", err)
 		}

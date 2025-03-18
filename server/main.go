@@ -47,6 +47,7 @@ func main() {
 		chkErr(err, "NewOneChain"+cfg.Name)
 		chainMap[cfg.ChainID] = onec
 		onec.MonPoolInit()
+		onec.MonClaimer()
 	}
 
 	// start grpc server, only listens on localhost
