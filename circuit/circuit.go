@@ -82,11 +82,10 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		)
 		eligible := sdk.ConstUint32(0) // check event poolid with all poolids
 		for j := range MaxPoolNum {
-			// if event poolid matches poolid, set eligiblePoolId to 1, otherwise keep as is
-			eligible = api.Uint32.Select(
-				sdk.Uint32{Val: api.Bytes32.IsEqual(poolIDs[j], r.Fields[0].Value).Val},
-				sdk.ConstUint32(1),
+			// if event poolid matches poolid, set eligible to 1, otherwise keep eligible as is
+			eligible = api.Uint32.Or(
 				eligible,
+				sdk.Uint32{Val: api.Bytes32.IsEqual(poolIDs[j], r.Fields[0].Value).Val},
 			)
 		}
 
@@ -152,7 +151,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		return api.Uint32.Select(
 			api.Uint32.IsGreaterThan(r.BlockNum, maxBlk),
 			r.BlockNum,
-			minBlk,
+			maxBlk,
 		)
 	})
 
@@ -184,7 +183,7 @@ func DefaultCircuit() *GasCircuit {
 }
 
 // ===== utils =====
-func Hex2Bytes(s string) (b []byte) {
+func Hex2Bytes(s string) []byte {
 	if len(s) >= 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X') {
 		s = s[2:]
 	}
@@ -192,6 +191,9 @@ func Hex2Bytes(s string) (b []byte) {
 	if len(s)%2 == 1 {
 		s = "0" + s
 	}
-	b, _ = hex.DecodeString(s)
+	b, err := hex.DecodeString(s)
+	if err != nil {
+		panic(err)
+	}
 	return b
 }

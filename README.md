@@ -14,6 +14,7 @@ Initially we expected router to emit Claimer address but final design only has v
 - use `cast create2 -s 0x112233` to get a salt so deployed addr starts w/ 0x112233. full addr is 0x112233C73c74a810BA963171ADc431A60e051D38
 - for full verification, we include [metadata](https://book.getfoundry.sh/guides/deterministic-deployments-using-create2#metadata-and-bytecode) downside is ClaimHelp.sol file must be kept exactly the same (even extra space will change code hash)
 - operation overhead is to call `claim(address router)` for supported routers
+- note `forge script script/create2_claimer.sol ... --verify` failed due to possibly an etherscan bug. Run `forge verify-contract 0x112233C73c74a810BA963171ADc431A60e051D38 ClaimHelp --chain sepolia` separately successfully verifies contract
 
 ## High level design
 
