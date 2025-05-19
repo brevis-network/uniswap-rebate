@@ -7,6 +7,12 @@ Over the time, scope/requirements have changed multiple times. Latest as of 2025
 1. swaps may happen on multiple chains that have uniswap v4 deployed. claim only happens on unichain
 2. each router impl `rebateClaimer() view` to indicate which address is allowed to call claim onchain
 3. rebate gas cost in Eth. rebate gas for one tx is `n * (rebatePerSwap+rebatePerHook) + rebateFixed` where n is number of valid swaps in this tx. Then compare the result with tx's actual gas usage * 0.8  and choose the smaller one
+## Workflow
+- Onchain setup: deploy ClaimHelp contract via create2 to address 0x112233C73c74a810BA963171ADc431A60e051D38. For supported routers, call `ClaimHelp.claim(router address)` which emits event `Claimer(address,address)`, needed later for zk circuit
+- projects submit list of tx hashes to Brevis gas rebate server and get a request id
+- Brevis server will fetch tx receipts, filter events by poolids (swaps on ineligible pools are ignored), add corresponding Claimer event and start zk proving process
+- Brevis server submits internal proof request to Brevis gateway, wait till final proof and onchain calldata becomes available and save to its own db
+- projects query Brevis server for calldata and send onchain tx to RouterRebates.claimWithZkProof
 
 ## ClaimHelp and Create2
 Initially we expected router to emit Claimer address but final design only has view func. We deploy a helper contract to call rebateClaimer and emit both router and claimer address. Use create2 to ensure ClaimHelp is deployed at the same address on every supported chain.
