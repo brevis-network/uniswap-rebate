@@ -7,7 +7,7 @@ prover = "http://localhost:9003"
 [[multichain]]
 chainID = 11155111
 name = "Sepolia"
-gateway = "https://sepolia.infura.io/v3/701edff6e8eb44c1b4e3fe36ee2b23fc"
+gateway = "https://sepolia.drpc.org"
 BlkInterval = 12
 BlkDelay = 2
 
