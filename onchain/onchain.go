@@ -110,7 +110,7 @@ func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 
 // go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr)
 // each prove req can have at most MaxSwap or MaxPoolNum whichever hits first
-func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string) ([]*OneProveReq, error) {
+func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Address) ([]*OneProveReq, error) {
 	rows, _ := c.db.Pools(context.Background(), c.ChainID)
 	poolidMap := make(map[common.Hash]binding.PoolKey)
 	for _, row := range rows {
@@ -119,7 +119,6 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string)
 
 	pmAddr := Hex2addr(c.PoolMgr)
 	swapEvId := Hex2hash(SwapEvId)
-	sender := c.FindSender(receipts, poolidMap)
 	claimev, err := c.db.ClaimerGet(context.Background(), dal.ClaimerGetParams{
 		Chid:   c.ChainID,
 		Router: Addr2hex(sender),
@@ -142,12 +141,11 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string)
 					// skip ineligible poolids
 					continue
 				}
-				// first eligible log, set sender
-				logSender := common.BytesToAddress(l.Topics[2][12:])
-				if sender != logSender {
-					// skip if sender already set but logSender is different
+				// skip if sender doesn't match
+				if sender != common.BytesToAddress(l.Topics[2][12:]) {
 					continue
 				}
+				// append
 				hasAppend = true
 				logs = append(logs, OneLog{
 					Log:          l,
@@ -198,22 +196,6 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, onlyPids []string)
 		}
 	}
 	return proveReqs, nil
-}
-
-// return first eligible swap sender. otherwise return zeroAddr
-func (c *OneChain) FindSender(receipts []*types.Receipt, poolids map[common.Hash]binding.PoolKey) common.Address {
-	pmAddr := Hex2addr(c.PoolMgr)
-	swapEvId := Hex2hash(SwapEvId)
-	for _, r := range receipts {
-		for _, l := range r.Logs {
-			if l.Address == pmAddr && l.Topics[0] == swapEvId {
-				if _, ok := poolids[l.Topics[1]]; ok {
-					return common.BytesToAddress(l.Topics[2][12:])
-				}
-			}
-		}
-	}
-	return ZeroAddr
 }
 
 func (c *OneChain) NewOneProveReq(claimev *types.Log) *OneProveReq {
