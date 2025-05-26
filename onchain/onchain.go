@@ -108,7 +108,7 @@ func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 	return ret, nil
 }
 
-// go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr)
+// go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr) and sender matches
 // each prove req can have at most MaxSwap or MaxPoolNum whichever hits first
 func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Address) ([]*OneProveReq, error) {
 	rows, _ := c.db.Pools(context.Background(), c.ChainID)
@@ -157,6 +157,10 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 		if hasAppend { // set last log.TxGasCap of this receipt
 			logs[len(logs)-1].TxGasCap = uint32(r.GasUsed * 80 / 100) // actual gas * 0.8
 		}
+	}
+
+	if len(logs) == 0 {
+		return nil, fmt.Errorf("no eligible swaps for sender %s", sender)
 	}
 
 	// Circuit supports up to MaxSwaps and MaxPoolNum
