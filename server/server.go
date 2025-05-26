@@ -14,6 +14,7 @@ import (
 
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/brevis-network/uniswap-rebate/webapi"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/spf13/viper"
 )
 
@@ -49,7 +50,7 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 	}
 
 	// check logs in receipts and prepare proof etc
-	prvR, err := onec.ProcessReceipts(receipts, req.PoolIds)
+	prvR, err := onec.ProcessReceipts(receipts, common.HexToAddress(req.Beneficiary))
 	if err != nil {
 		ret.Errmsg = "ProcessReceipts err: " + err.Error()
 		return

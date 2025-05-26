@@ -2,12 +2,6 @@ package onchain
 
 import "github.com/spf13/viper"
 
-const (
-	// ecdsa keystore json, needed to send onchain tx eg. deploy contract
-	kKsPath = "kspath"
-	kKsPwd  = "kspwd"
-)
-
 // config related defs and func
 func GetMcc(key string) MultiChainConfig {
 	var m MultiChainConfig
