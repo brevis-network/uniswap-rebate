@@ -130,6 +130,9 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 	// go over tx receipts to filter eligible Swap logs
 	var logs []OneLog
 	for _, r := range receipts {
+		if len(r.Logs) == 0 {
+			continue
+		}
 		// all logs in one receipt has same logIdxOffset
 		logIdxOffset := r.Logs[0].Index
 		hasAppend := false // for this receipt, whether we have appended OneLog to logs, if true we need to set last OneLog TxGasCap
