@@ -31,7 +31,7 @@ import (
 
 // flags
 var (
-	brvGw string
+	brvGw, rpcURL string
 	// accept req on this port
 	lport int
 )
@@ -44,7 +44,7 @@ var (
 )
 
 const (
-	BrvApiKey = "123456" // need another key?
+	BrvApiKey = "" // api key talk to brevis gateway
 )
 
 // proveCmd represents the prove command
@@ -57,7 +57,7 @@ var proveCmd = &cobra.Command{
 
 		// takes minutes to load
 		var err error
-		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(appCircuit, outDir)
+		compiledCircuit, pk, vk, vkHash, err = sdk.ReadSetupFrom(appCircuit, outDir, sdk.NewBrevisAppWithDigestsSetOnlyFromRemote())
 		chkErr(err, "ReadSetupFrom "+outDir)
 		// var buf bytes.Buffer
 		// vk.WriteTo(&buf)
@@ -118,24 +118,13 @@ func ProveReqs(reqs []*onchain.OneProveReq) {
 }
 
 func DoOneReq(r *onchain.OneProveReq, batchIdx int) (*gwproto.Query, error) {
-	log.Infoln("req", r.ReqId, "pools:", r.PoolIds)
+	log.Infoln("req", r.ReqId, "pools:", r.PoolKey)
 
-	app, _ := sdk.NewBrevisApp(r.ChainId, brvGw)
+	app, _ := sdk.NewBrevisApp(r.ChainId, rpcURL, outDir, brvGw)
 	var receipts []*sdk.ReceiptData
-	var lastBlockNum uint64
-	for i, onelog := range r.Logs {
-		blkNum := onelog.Swap.BlockNumber
-		block := r.Blks[blkNum]
-		if blkNum != lastBlockNum {
-			app.AddStorage(sdk.StorageData{
-				BlockNum:     new(big.Int).SetUint64(blkNum),
-				BlockBaseFee: new(big.Int).SetUint64(block.BaseFee),
-				Address:      onchain.Hex2addr(r.Oracle),
-				Slot:         onchain.ZeroHash,
-				Value:        block.SlotValue,
-			}, i) // special mode, sdk will fill dummy in between
-		}
-		rd := OneLog2SdkReceipt(onelog, block.BaseFee)
+
+	for _, onelog := range r.Logs {
+		rd := OneLog2SdkReceipt(onelog)
 		receipts = append(receipts, &rd)
 		app.AddReceipt(rd)
 	}
@@ -168,19 +157,16 @@ func DoOneReq(r *onchain.OneProveReq, batchIdx int) (*gwproto.Query, error) {
 	publicWitness.WriteTo(&b)
 	witnessStr := hex.EncodeToString(b.Bytes())
 	return &gwproto.Query{
-		AppCircuitInfo:    buildAppCircuitInfo(circuitInput, witnessStr, vkHashStr, proofStr, ""),
-		ReceiptInfos:      buildReceiptInfos(receipts),
-		StorageQueryInfos: buildStorageInfos(r.Blks, r.Oracle, onchain.Hash2Hex(onchain.ZeroHash)),
+		AppCircuitInfo: buildAppCircuitInfo(circuitInput, witnessStr, vkHashStr, proofStr, ""),
+		ReceiptInfos:   buildReceiptInfos(receipts),
 	}, nil
 }
 
-func OneLog2SdkReceipt(swap onchain.OneLog, basefee, timestamp uint64) sdk.ReceiptData {
+func OneLog2SdkReceipt(swap onchain.OneLog) sdk.ReceiptData {
 	ret := sdk.ReceiptData{
-		BlockNum:       new(big.Int).SetUint64(swap.BlockNumber),
-		BlockBaseFee:   new(big.Int).SetUint64(basefee),
-		BlockTimestamp: timestamp,
-		TxHash:         swap.TxHash,
-		MptKeyPath:     TxIdx2MptPath(swap.TxIndex),
+		BlockNum:   new(big.Int).SetUint64(swap.BlockNumber),
+		TxHash:     swap.TxHash,
+		MptKeyPath: TxIdx2MptPath(swap.TxIndex),
 	}
 	ret.Fields[0] = sdk.LogFieldData{
 		Contract:   swap.Address,
@@ -204,17 +190,6 @@ func OneLog2SdkReceipt(swap onchain.OneLog, basefee, timestamp uint64) sdk.Recei
 func TxIdx2MptPath(txidx uint) *big.Int {
 	var b []byte
 	return new(big.Int).SetBytes(rlp.AppendUint64(b, uint64(txidx)))
-}
-
-func buildStorageInfos(m map[uint64]onchain.OneBlock, addr string, slot ...string) (infos []*gwproto.StorageQueryInfo) {
-	for blknum := range m {
-		infos = append(infos, &gwproto.StorageQueryInfo{
-			Account:     addr,
-			StorageKeys: slot,
-			BlkNum:      blknum,
-		})
-	}
-	return
 }
 
 func buildReceiptInfos(r []*sdk.ReceiptData) (infos []*gwproto.ReceiptInfo) {

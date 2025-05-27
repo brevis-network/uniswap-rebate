@@ -28,8 +28,6 @@ type OneProveReq struct {
 	// swaps from same tx must be together (ok to re-order)
 	Logs []OneLog
 
-	// blknum -> info about at this block, needed when build sdk.ReceiptData
-	Blks map[uint64]OneBlock
 	// set by server
 	ReqId int64
 }
