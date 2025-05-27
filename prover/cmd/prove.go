@@ -235,9 +235,9 @@ func buildAppCircuitInfo(in sdk.CircuitInput, witness, vk, proof, cbaddr string)
 		InputCommitmentsRoot: fmt.Sprintf("0x%x", in.InputCommitmentsRoot),
 		Witness:              witness,
 		MaxReceipts:          circuit.MaxReceipts,
-		MaxStorage:           circuit.MaxReceipts,
+		MaxStorage:           0,
 		MaxTx:                0,
-		MaxNumDataPoints:     128, // hardcode for now
+		MaxNumDataPoints:     circuit.MaxReceipts, // hardcode for now
 	}
 }
 
