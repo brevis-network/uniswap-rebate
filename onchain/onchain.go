@@ -3,7 +3,6 @@ package onchain
 import (
 	"context"
 	"fmt"
-	"math/big"
 	"slices"
 	"time"
 
@@ -131,6 +130,9 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 	// go over tx receipts to filter eligible Swap logs
 	var logs []OneLog
 	for _, r := range receipts {
+		if len(r.Logs) == 0 {
+			continue
+		}
 		// all logs in one receipt has same logIdxOffset
 		logIdxOffset := r.Logs[0].Index
 		hasAppend := false // for this receipt, whether we have appended OneLog to logs, if true we need to set last OneLog TxGasCap
@@ -171,37 +173,43 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 	// go over logs, and keep track of unique poolids and count, if exceeds MaxSwaps or MaxPoolNum, creates NewOneProveReq
 	var proveReqs []*OneProveReq
 	curReq := c.NewOneProveReq(&claimev.Raw)
+	proveReqs = append(proveReqs, curReq)
+
 	curPoolMap := make(PoolIdMap) // unique poolids in current req
 	// blkNums is sorted ascending
 	blkNums, blk2swaps := SwapsByBlock(logs)
 	for _, blknum := range blkNums {
-		// pupulate curReq blk map
-		block, _ := c.ec.BlockByNumber(context.Background(), new(big.Int).SetUint64(blknum))
-		curReq.Blks[blknum] = OneBlock{
-			BaseFee:   block.BaseFee().Uint64(),
-			Timestamp: block.Time(),
-		}
 		one := blk2swaps[blknum]
+		// single block is too big, fail for now and guide requester to use another flow
+		if len(one.PoolIds) > circuit.MaxPoolNum || len(one.Logs) > circuit.MaxSwapNum {
+			return nil, fmt.Errorf("swaps on block %d exceed limit. pools %d, swaps %d", blknum, len(one.PoolIds), len(one.Logs))
+		}
 		// swaps includes logs and map of poolid, if within limit, add to curReq
 		if len(curReq.Logs)+len(one.Logs) <= circuit.MaxSwapNum &&
 			curPoolMap.CombineCount(one.PoolIds) <= circuit.MaxPoolNum {
 			curReq.Logs = append(curReq.Logs, one.Logs...)
 			curPoolMap.Merge(one.PoolIds)
 		} else {
-			// can't fit, need to create new req, but first populate req.PoolKey
+			// can't fit into current req, need to create new req, but first populate req.PoolKey
 			for k := range curPoolMap {
 				curReq.PoolKey = append(curReq.PoolKey, poolidMap[k])
 			}
-			proveReqs = append(proveReqs, curReq)
+
 			curReq = c.NewOneProveReq(&claimev.Raw)
-			curPoolMap = make(PoolIdMap)
+			clear(curPoolMap)
 			curReq.Logs = append(curReq.Logs, one.Logs...)
 			curPoolMap.Merge(one.PoolIds)
+		}
+	}
+	if len(curReq.PoolKey) == 0 {
+		for k := range curPoolMap {
+			curReq.PoolKey = append(curReq.PoolKey, poolidMap[k])
 		}
 	}
 	return proveReqs, nil
 }
 
+// ReqId is set by server.go
 func (c *OneChain) NewOneProveReq(claimev *types.Log) *OneProveReq {
 	return &OneProveReq{
 		ChainId:    c.ChainID,
@@ -212,6 +220,5 @@ func (c *OneChain) NewOneProveReq(claimev *types.Log) *OneProveReq {
 			Log:          claimev,
 			LogIdxOffset: claimev.Index,
 		}},
-		Blks: make(map[uint64]OneBlock),
 	}
 }
