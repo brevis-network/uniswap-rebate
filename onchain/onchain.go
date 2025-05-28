@@ -84,10 +84,16 @@ func (c *OneChain) Close() {
 // receipts are sorted by blocknum and index ascending
 func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 	var ret []*types.Receipt
+	// if err, curBlkNum is 0, will skip block number check
+	curBlkNum, _ := c.ec.BlockNumber(context.Background())
 	for _, tx := range txlist {
 		r, err := c.ec.TransactionReceipt(context.Background(), Hex2hash(tx))
 		if err != nil {
 			return ret, err
+		}
+		// reject if tx too recent to avoid reorg
+		if curBlkNum > 0 && r.BlockNumber.Uint64()+c.BlkDelay > curBlkNum {
+			return nil, fmt.Errorf("%s blocknum %d is too recent", tx, r.BlockNumber.Uint64())
 		}
 		ret = append(ret, r)
 	}
