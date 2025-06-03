@@ -12,5 +12,6 @@ BlkInterval = 12
 BlkDelay = 2
 
 GasPerSwap = 80000
+GasPerTx = 80000
 PoolMgr = "0x8C4BcBE6b9eF47855f97E675296FA3F6fafa5F1A"
 VkHash = ""
