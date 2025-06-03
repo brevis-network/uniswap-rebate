@@ -202,6 +202,7 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 			}
 
 			curReq = c.NewOneProveReq(&claimev.Raw)
+			proveReqs = append(proveReqs, curReq)
 			clear(curPoolMap)
 			curReq.Logs = append(curReq.Logs, one.Logs...)
 			curPoolMap.Merge(one.PoolIds)
