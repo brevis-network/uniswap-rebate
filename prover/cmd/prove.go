@@ -237,7 +237,7 @@ func buildAppCircuitInfo(in sdk.CircuitInput, witness, vk, proof, cbaddr string)
 		MaxReceipts:          circuit.MaxReceipts,
 		MaxStorage:           0,
 		MaxTx:                0,
-		MaxNumDataPoints:     circuit.MaxReceipts, // hardcode for now
+		MaxNumDataPoints:     uint32(sdk.DataPointsNextPowerOf2(circuit.MaxReceipts)),
 	}
 }
 
