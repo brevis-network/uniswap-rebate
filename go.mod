@@ -5,7 +5,7 @@ go 1.22.0
 toolchain go1.22.11
 
 require (
-	github.com/brevis-network/brevis-sdk v0.3.26
+	github.com/brevis-network/brevis-sdk v0.3.33
 	github.com/cockroachdb/cockroach-go/v2 v2.3.8
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.25.1
@@ -39,6 +39,7 @@ require (
 	github.com/getsentry/sentry-go v0.27.0 // indirect
 	github.com/gofrs/flock v0.8.1 // indirect
 	github.com/gogo/protobuf v1.3.2 // indirect
+	github.com/gowebpki/jcs v1.0.1 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
@@ -62,6 +63,7 @@ require (
 	github.com/prometheus/common v0.39.0 // indirect
 	github.com/prometheus/procfs v0.9.0 // indirect
 	github.com/rogpeppe/go-internal v1.12.0 // indirect
+	github.com/rs/cors v1.7.0 // indirect
 	github.com/sagikazarmark/locafero v0.4.0 // indirect
 	github.com/sagikazarmark/slog-shim v0.1.0 // indirect
 	github.com/sourcegraph/conc v0.3.0 // indirect

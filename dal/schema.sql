@@ -20,13 +20,28 @@ CREATE TABLE IF NOT EXISTS pools (
 );
 
 CREATE TABLE IF NOT EXISTS reqs (
-    id BIGINT PRIMARY KEY, -- epoch seconds when requested
+    id BIGINT PRIMARY KEY, -- epoch milliseconds when requested
     router TEXT NOT NULL, -- sender of first eligible swap, not required for function but help w/ debugging/support
     step INT NOT NULL DEFAULT 0, -- 0: fetching tx receipts done 1: started app circuit proof 2: has app proof, sent to Brevis gw for final proof 3: have data ready to submit
     proofreq JSONB NOT NULL, -- webapi.NewProofReq
     calldata JSONB -- only not null if step is 3 (received ready to send onchain data from Brevis gw)
 );
 CREATE INDEX IF NOT EXISTS reqs_router on reqs (router);
+
+-- keep track of proof steps
+CREATE TABLE IF NOT EXISTS proof (
+    reqid BIGINT NOT NULL, -- reqs.id but may repeat
+    idx INT NOT NULL DEFAULT 0, -- multiple proofs for one reqs.id, each w/ unique idx. (reqid, idx) identify one proof
+    prover_rpc TEXT NOT NULL,
+    app_proof_id TEXT NOT NULL,
+    app_circuit_info BYTEA NOT NULL, -- jsonb?
+    app_proof TEXT NOT NULL DEFAULT '',
+    gateway_batch_id TEXT NOT NULL DEFAULT '', -- batch_id and nonce are same for all proofs of same reqid
+    gateway_request_id TEXT NOT NULL DEFAULT '', -- SendBatchQueriesAsyncResponse.request_ids[idx]
+    gateway_nonce BIGINT NOT NULL DEFAULT 0,
+    gateway_query_status JSONB, -- gw proto GetQueryStatusResponse
+    UNIQUE (reqid, idx) -- one req may have multiple proofs then aggregate
+);
 
 -- persist block num/index to resume when restart, key is chid-addr
 CREATE TABLE IF NOT EXISTS monitor (

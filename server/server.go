@@ -23,7 +23,8 @@ type Server struct {
 }
 
 func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *webapi.NewProofResp, err error) {
-	log.Println(req)
+	reqid := time.Now().UnixMilli()
+
 	ret = new(webapi.NewProofResp)
 	// parse and get tx receipt now even though it may take a long time for this api to return
 	// so client knows error immediately instead of later polling
@@ -32,16 +33,30 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 		ret.Errmsg = fmt.Sprintf("unsupported chainid %d", req.ChainId)
 		return
 	}
+	_, err = s.db.ClaimerGet(context.Background(), dal.ClaimerGetParams{
+		Chid:   req.ChainId,
+		Router: strings.ToLower(req.Beneficiary),
+	})
+	found, err := dal.ChkQueryRow(err)
+	if !found {
+		ret.Errmsg = fmt.Sprintf("unsupported router %s. Please contact Brevis team.", req.Beneficiary)
+		return
+	}
+	if err != nil {
+		ret.Errmsg = fmt.Sprintf("db err: %v", err)
+		return
+	}
+	// fetch tx Receipts
 	txList := strings.Split(req.TxnHashes, ",")
+	log.Println("newproof", reqid, "chain:", req.ChainId, "router:", req.Beneficiary, "tx num:", len(txList))
 	receipts, err := onec.FetchTxReceipts(txList)
 	if err != nil {
 		ret.Errmsg = "get receipts err: " + err.Error()
 		return
 	}
 
-	reqid := time.Now().Unix()
-	// save json file in case need to resume
-	fname := fmt.Sprintf("%s/%d-receipts.json", *fdir, reqid)
+	// save in db? save json file in case need to resume
+	fname := fmt.Sprintf("%s/receipts-%d-%d.json", *fdir, req.ChainId, reqid)
 	raw, _ := json.Marshal(receipts)
 	err = os.WriteFile(fname, raw, os.ModePerm)
 	if err != nil {
@@ -62,10 +77,6 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 	for _, r := range prvR {
 		r.ReqId = reqid
 	}
-
-	fname = fmt.Sprintf("%s/%d-proveReqs.json", *fdir, reqid)
-	raw, _ = json.Marshal(prvR)
-	os.WriteFile(fname, raw, os.ModePerm)
 
 	// submit to app prover
 	resp, err := http.Post(viper.GetString("prover")+"/prove", "application/json", bytes.NewBuffer(raw))

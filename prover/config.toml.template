@@ -1,0 +1,16 @@
+circuit_name = "" # Fill in
+grpc_port = 9001
+rest_port = 9002
+
+[service]
+prover_id = "" # Use hostname
+setup_dir = "$HOME/circuitOut/unigas" # To be appended with "/{circuit_name}"
+srs_dir = "$HOME/kzgsrs"
+gateway_url = "52.13.236.124:11080"
+direct_load = true
+proof_persistence_type = "s3"
+proof_persistence_options = "" # Fill in
+data_persistence_type = "file"
+data_persistence_options = "" # Use default
+concurrent_fetch_limit = 20
+concurrent_prove_limit = 1
