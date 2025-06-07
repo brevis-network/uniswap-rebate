@@ -5,6 +5,8 @@
 package dal
 
 import (
+	"github.com/brevis-network/brevis-sdk/sdk/proto/commonproto"
+	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
 	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/webapi"
 )
@@ -27,9 +29,24 @@ type Pool struct {
 	Poolkey binding.PoolKey `json:"poolkey"`
 }
 
+type Proof struct {
+	Reqid              int64                           `json:"reqid"`
+	Idx                int32                           `json:"idx"`
+	AppProver          string                          `json:"appProver"`
+	AppProofID         string                          `json:"appProofId"`
+	AppCircuitInfo     *commonproto.AppCircuitInfo     `json:"appCircuitInfo"`
+	AppProof           string                          `json:"appProof"`
+	GatewayBatchID     string                          `json:"gatewayBatchId"`
+	GatewayRequestID   string                          `json:"gatewayRequestId"`
+	GatewayNonce       int64                           `json:"gatewayNonce"`
+	GatewayQueryStatus *gwproto.GetQueryStatusResponse `json:"gatewayQueryStatus"`
+}
+
 type Req struct {
-	ID       int64               `json:"id"`
-	Step     int32               `json:"step"`
-	Proofreq *webapi.NewProofReq `json:"proofreq"`
-	Calldata binding.CallData    `json:"calldata"`
+	ID        int64               `json:"id"`
+	Router    string              `json:"router"`
+	Step      int32               `json:"step"`
+	UsrReq    *webapi.NewProofReq `json:"usrReq"`
+	ProofInfo binding.ProofInfo   `json:"proofInfo"`
+	Calldata  binding.CallData    `json:"calldata"`
 }

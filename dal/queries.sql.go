@@ -134,31 +134,33 @@ func (q *Queries) Pools(ctx context.Context, chid uint64) ([]PoolsRow, error) {
 }
 
 const reqAdd = `-- name: ReqAdd :exec
-INSERT INTO reqs (id, proofreq) VALUES ($1, $2)
+INSERT INTO reqs (id, router, usr_req, proof_info) VALUES ($1, $2, $3, $4)
 `
 
 type ReqAddParams struct {
-	ID       int64               `json:"id"`
-	Proofreq *webapi.NewProofReq `json:"proofreq"`
+	ID        int64               `json:"id"`
+	Router    string              `json:"router"`
+	UsrReq    *webapi.NewProofReq `json:"usrReq"`
+	ProofInfo binding.ProofInfo   `json:"proofInfo"`
 }
 
 func (q *Queries) ReqAdd(ctx context.Context, arg ReqAddParams) error {
-	_, err := q.db.ExecContext(ctx, reqAdd, arg.ID, arg.Proofreq)
+	_, err := q.db.ExecContext(ctx, reqAdd,
+		arg.ID,
+		arg.Router,
+		arg.UsrReq,
+		arg.ProofInfo,
+	)
 	return err
 }
 
-const reqGet = `-- name: ReqGet :one
-SELECT id, step, proofreq, calldata FROM reqs WHERE id = $1
+const reqGetCalldata = `-- name: ReqGetCalldata :one
+SELECT calldata FROM reqs WHERE id = $1
 `
 
-func (q *Queries) ReqGet(ctx context.Context, id int64) (Req, error) {
-	row := q.db.QueryRowContext(ctx, reqGet, id)
-	var i Req
-	err := row.Scan(
-		&i.ID,
-		&i.Step,
-		&i.Proofreq,
-		&i.Calldata,
-	)
-	return i, err
+func (q *Queries) ReqGetCalldata(ctx context.Context, id int64) (binding.CallData, error) {
+	row := q.db.QueryRowContext(ctx, reqGetCalldata, id)
+	var calldata binding.CallData
+	err := row.Scan(&calldata)
+	return calldata, err
 }

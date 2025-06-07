@@ -17,6 +17,7 @@ import (
 	"github.com/brevis-network/brevis-sdk/sdk"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/commonproto"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
+	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/onchain"
 	"github.com/celer-network/goutils/log"
@@ -162,7 +163,7 @@ func DoOneReq(r *onchain.OneProveReq, batchIdx int) (*gwproto.Query, error) {
 	}, nil
 }
 
-func OneLog2SdkReceipt(swap onchain.OneLog) sdk.ReceiptData {
+func OneLog2SdkReceipt(swap binding.OneLog) sdk.ReceiptData {
 	ret := sdk.ReceiptData{
 		BlockNum:   new(big.Int).SetUint64(swap.BlockNumber),
 		TxHash:     swap.TxHash,

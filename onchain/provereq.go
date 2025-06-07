@@ -26,7 +26,7 @@ type OneProveReq struct {
 	// circuit input receipts, first is claimer, rest are swaps
 	// all Swap logs have same sender, sorted by blknum
 	// swaps from same tx must be together (ok to re-order)
-	Logs []OneLog
+	Logs []binding.OneLog
 
 	// set by server
 	ReqId int64

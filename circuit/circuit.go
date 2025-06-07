@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	MaxPoolNum  = 64
-	MaxReceipts = 512
+	MaxPoolNum  = 32
+	MaxReceipts = 1024
 	MaxSwapNum  = MaxReceipts - 1 // need 1 for claimer
 
 	maxU32 uint32 = math.MaxUint32

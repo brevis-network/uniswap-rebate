@@ -15,10 +15,10 @@ SELECT poolkey FROM pools WHERE chid = $1 and poolid = $2;
 SELECT poolid, poolkey FROM pools WHERE chid = $1;
 
 -- name: ReqAdd :exec
-INSERT INTO reqs (id, proofreq) VALUES ($1, $2);
+INSERT INTO reqs (id, router, usr_req, proof_info) VALUES ($1, $2, $3, $4);
 
--- name: ReqGet :one
-SELECT * FROM reqs WHERE id = $1;
+-- name: ReqGetCalldata :one
+SELECT calldata FROM reqs WHERE id = $1;
 
 -- name: ClaimerAdd :exec
 INSERT INTO claimer (chid, router, evlog) VALUES ($1, $2, $3);

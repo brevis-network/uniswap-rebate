@@ -22,8 +22,9 @@ CREATE TABLE IF NOT EXISTS pools (
 CREATE TABLE IF NOT EXISTS reqs (
     id BIGINT PRIMARY KEY, -- epoch milliseconds when requested
     router TEXT NOT NULL, -- sender of first eligible swap, not required for function but help w/ debugging/support
-    step INT NOT NULL DEFAULT 0, -- 0: fetching tx receipts done 1: started app circuit proof 2: has app proof, sent to Brevis gw for final proof 3: have data ready to submit
-    proofreq JSONB NOT NULL, -- webapi.NewProofReq
+    step INT NOT NULL DEFAULT 0, -- 0: accepted, will start proving 1: started app circuit proof 2: has app proof, sent to Brevis gw for final proof 3: have data ready to submit
+    usr_req JSONB NOT NULL, -- webapi.NewProofReq from user
+    proof_info JSONB NOT NULL, -- binding.ProofInfo, include []OneLog and configs necessary for prove
     calldata JSONB -- only not null if step is 3 (received ready to send onchain data from Brevis gw)
 );
 CREATE INDEX IF NOT EXISTS reqs_router on reqs (router);
@@ -32,10 +33,10 @@ CREATE INDEX IF NOT EXISTS reqs_router on reqs (router);
 CREATE TABLE IF NOT EXISTS proof (
     reqid BIGINT NOT NULL, -- reqs.id but may repeat
     idx INT NOT NULL DEFAULT 0, -- multiple proofs for one reqs.id, each w/ unique idx. (reqid, idx) identify one proof
-    prover_rpc TEXT NOT NULL,
-    app_proof_id TEXT NOT NULL,
-    app_circuit_info BYTEA NOT NULL, -- jsonb?
-    app_proof TEXT NOT NULL DEFAULT '',
+    app_prover TEXT NOT NULL, -- rpc ip:port for app prover
+    app_proof_id TEXT NOT NULL, -- from prover ProveAsyncResponse
+    app_circuit_info JSONB, -- commonproto.AppCircuitInfo received from prover
+    app_proof TEXT NOT NULL DEFAULT '', -- prover GetProofResponse
     gateway_batch_id TEXT NOT NULL DEFAULT '', -- batch_id and nonce are same for all proofs of same reqid
     gateway_request_id TEXT NOT NULL DEFAULT '', -- SendBatchQueriesAsyncResponse.request_ids[idx]
     gateway_nonce BIGINT NOT NULL DEFAULT 0,

@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/brevis-network/uniswap-rebate/binding"
-	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/celer-network/goutils/eth/mon2"
 	"github.com/ethereum/go-ethereum/common"
@@ -31,17 +30,6 @@ type OneChain struct {
 	ec  *ethclient.Client
 	mon *mon2.Monitor
 	db  *dal.DAL
-}
-
-type OneLog struct {
-	*types.Log   // may also be Claimer event
-	LogIdxOffset uint
-	TxGasCap     uint32 // tx gas * 0.8. if 0, means next swap is from same tx
-}
-
-// only valid for swap, return topics[1]
-func (o OneLog) PoolId() common.Hash {
-	return o.Topics[1]
 }
 
 // return err if dial fail or chainid mismatch
@@ -114,9 +102,12 @@ func (c *OneChain) FetchTxReceipts(txlist []string) ([]*types.Receipt, error) {
 }
 
 // go through receipt.Logs, check poolid is in db (eligible w/ non-zero hook addr) and sender matches
-// each prove req can have at most MaxSwap or MaxPoolNum whichever hits first
-func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Address) ([]*OneProveReq, error) {
-	rows, _ := c.db.Pools(context.Background(), c.ChainID)
+// return ready to use []OneLog, could be empty if none qualify
+func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Address) (logs []binding.OneLog, err error) {
+	rows, err := c.db.Pools(context.Background(), c.ChainID)
+	if err != nil {
+		return logs, fmt.Errorf("db get Pools err: %w", err)
+	}
 	poolidMap := make(map[common.Hash]binding.PoolKey)
 	for _, row := range rows {
 		poolidMap[Hex2hash(row.Poolid)] = row.Poolkey
@@ -124,17 +115,8 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 
 	pmAddr := Hex2addr(c.PoolMgr)
 	swapEvId := Hex2hash(SwapEvId)
-	claimev, err := c.db.ClaimerGet(context.Background(), dal.ClaimerGetParams{
-		Chid:   c.ChainID,
-		Router: Addr2hex(sender),
-	})
-	found, _ := dal.ChkQueryRow(err)
-	if !found {
-		return nil, fmt.Errorf("please contact Brevis team for proper setup of %s", sender)
-	}
 
 	// go over tx receipts to filter eligible Swap logs
-	var logs []OneLog
 	for _, r := range receipts {
 		if len(r.Logs) == 0 {
 			continue
@@ -155,7 +137,7 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 				}
 				// append
 				hasAppend = true
-				logs = append(logs, OneLog{
+				logs = append(logs, binding.OneLog{
 					Log:          l,
 					LogIdxOffset: logIdxOffset,
 					// TxGasCap default 0
@@ -166,7 +148,10 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 			logs[len(logs)-1].TxGasCap = uint32(r.GasUsed * 80 / 100) // actual gas * 0.8
 		}
 	}
+	return logs, nil
+}
 
+/*
 	if len(logs) == 0 {
 		return nil, fmt.Errorf("no eligible swaps for sender %s", sender)
 	}
@@ -215,7 +200,8 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 	}
 	return proveReqs, nil
 }
-
+*/
+/*
 // ReqId is set by server.go
 func (c *OneChain) NewOneProveReq(claimev *types.Log) *OneProveReq {
 	return &OneProveReq{
@@ -229,3 +215,4 @@ func (c *OneChain) NewOneProveReq(claimev *types.Log) *OneProveReq {
 		}},
 	}
 }
+*/
