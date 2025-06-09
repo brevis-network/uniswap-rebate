@@ -8,6 +8,8 @@ package dal
 import (
 	"context"
 
+	"github.com/brevis-network/brevis-sdk/sdk/proto/commonproto"
+	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
 	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/webapi"
 )
@@ -131,6 +133,127 @@ func (q *Queries) Pools(ctx context.Context, chid uint64) ([]PoolsRow, error) {
 		return nil, err
 	}
 	return items, nil
+}
+
+const proofAdd = `-- name: ProofAdd :exec
+INSERT INTO proof (reqid, idx, app_prover, app_proof_id, app_circuit_info) VALUES ($1, $2, $3, $4, $5)
+`
+
+type ProofAddParams struct {
+	Reqid          int64                       `json:"reqid"`
+	Idx            int                         `json:"idx"`
+	AppProver      string                      `json:"appProver"`
+	AppProofID     string                      `json:"appProofId"`
+	AppCircuitInfo *commonproto.AppCircuitInfo `json:"appCircuitInfo"`
+}
+
+func (q *Queries) ProofAdd(ctx context.Context, arg ProofAddParams) error {
+	_, err := q.db.ExecContext(ctx, proofAdd,
+		arg.Reqid,
+		arg.Idx,
+		arg.AppProver,
+		arg.AppProofID,
+		arg.AppCircuitInfo,
+	)
+	return err
+}
+
+const proofGetIds = `-- name: ProofGetIds :many
+SELECT idx, app_proof_id, gateway_batch_id, gateway_request_id, gateway_nonce FROM proof WHERE reqid = $1 ORDER BY idx
+`
+
+type ProofGetIdsRow struct {
+	Idx              int    `json:"idx"`
+	AppProofID       string `json:"appProofId"`
+	GatewayBatchID   string `json:"gatewayBatchId"`
+	GatewayRequestID string `json:"gatewayRequestId"`
+	GatewayNonce     uint64 `json:"gatewayNonce"`
+}
+
+func (q *Queries) ProofGetIds(ctx context.Context, reqid int64) ([]ProofGetIdsRow, error) {
+	rows, err := q.db.QueryContext(ctx, proofGetIds, reqid)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ProofGetIdsRow
+	for rows.Next() {
+		var i ProofGetIdsRow
+		if err := rows.Scan(
+			&i.Idx,
+			&i.AppProofID,
+			&i.GatewayBatchID,
+			&i.GatewayRequestID,
+			&i.GatewayNonce,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const proofSetAppProof = `-- name: ProofSetAppProof :exec
+UPDATE proof SET app_proof = $1 and app_circuit_info = $2 WHERE app_proof_id = $3
+`
+
+type ProofSetAppProofParams struct {
+	AppProof       string                      `json:"appProof"`
+	AppCircuitInfo *commonproto.AppCircuitInfo `json:"appCircuitInfo"`
+	AppProofID     string                      `json:"appProofId"`
+}
+
+func (q *Queries) ProofSetAppProof(ctx context.Context, arg ProofSetAppProofParams) error {
+	_, err := q.db.ExecContext(ctx, proofSetAppProof, arg.AppProof, arg.AppCircuitInfo, arg.AppProofID)
+	return err
+}
+
+const proofSetGwInfo = `-- name: ProofSetGwInfo :exec
+UPDATE proof
+SET gateway_batch_id = $1,
+    gateway_request_id = $2,
+    gateway_nonce = $3
+WHERE reqid = $4 AND idx = $5
+`
+
+type ProofSetGwInfoParams struct {
+	GatewayBatchID   string `json:"gatewayBatchId"`
+	GatewayRequestID string `json:"gatewayRequestId"`
+	GatewayNonce     uint64 `json:"gatewayNonce"`
+	Reqid            int64  `json:"reqid"`
+	Idx              int    `json:"idx"`
+}
+
+func (q *Queries) ProofSetGwInfo(ctx context.Context, arg ProofSetGwInfoParams) error {
+	_, err := q.db.ExecContext(ctx, proofSetGwInfo,
+		arg.GatewayBatchID,
+		arg.GatewayRequestID,
+		arg.GatewayNonce,
+		arg.Reqid,
+		arg.Idx,
+	)
+	return err
+}
+
+const proofSetGwResp = `-- name: ProofSetGwResp :exec
+UPDATE proof SET gateway_query_status = $1 WHERE gateway_request_id = $2 AND gateway_nonce = $3
+`
+
+type ProofSetGwRespParams struct {
+	GatewayQueryStatus *gwproto.GetQueryStatusResponse `json:"gatewayQueryStatus"`
+	GatewayRequestID   string                          `json:"gatewayRequestId"`
+	GatewayNonce       uint64                          `json:"gatewayNonce"`
+}
+
+func (q *Queries) ProofSetGwResp(ctx context.Context, arg ProofSetGwRespParams) error {
+	_, err := q.db.ExecContext(ctx, proofSetGwResp, arg.GatewayQueryStatus, arg.GatewayRequestID, arg.GatewayNonce)
+	return err
 }
 
 const reqAdd = `-- name: ReqAdd :exec

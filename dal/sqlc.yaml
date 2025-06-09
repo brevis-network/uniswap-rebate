@@ -30,3 +30,7 @@ overrides:
     column: "proof.app_circuit_info"
   - go_type: "*github.com/brevis-network/brevis-sdk/sdk/proto/gwproto.GetQueryStatusResponse"
     column: "proof.gateway_query_status"
+  - go_type: "uint64"
+    column: "proof.gateway_nonce"
+  - go_type: "int"
+    column: "proof.idx"

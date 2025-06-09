@@ -23,7 +23,7 @@ func (o OneLog) PoolId() common.Hash {
 // all info needed to start proving for one user request, may have multiple app proofs
 type ProofInfo struct {
 	ReqId   int64
-	ChainId uint64
+	ChainId uint64 // src chain id
 	PoolMgr string
 	Logs    []OneLog // fist is claimev, rest are swaps
 	//

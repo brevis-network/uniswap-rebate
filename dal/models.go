@@ -31,14 +31,14 @@ type Pool struct {
 
 type Proof struct {
 	Reqid              int64                           `json:"reqid"`
-	Idx                int32                           `json:"idx"`
+	Idx                int                             `json:"idx"`
 	AppProver          string                          `json:"appProver"`
 	AppProofID         string                          `json:"appProofId"`
 	AppCircuitInfo     *commonproto.AppCircuitInfo     `json:"appCircuitInfo"`
 	AppProof           string                          `json:"appProof"`
 	GatewayBatchID     string                          `json:"gatewayBatchId"`
 	GatewayRequestID   string                          `json:"gatewayRequestId"`
-	GatewayNonce       int64                           `json:"gatewayNonce"`
+	GatewayNonce       uint64                          `json:"gatewayNonce"`
 	GatewayQueryStatus *gwproto.GetQueryStatusResponse `json:"gatewayQueryStatus"`
 }
 

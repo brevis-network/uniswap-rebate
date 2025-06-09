@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS proof (
     idx INT NOT NULL DEFAULT 0, -- multiple proofs for one reqs.id, each w/ unique idx. (reqid, idx) identify one proof
     app_prover TEXT NOT NULL, -- rpc ip:port for app prover
     app_proof_id TEXT NOT NULL, -- from prover ProveAsyncResponse
-    app_circuit_info JSONB, -- commonproto.AppCircuitInfo received from prover
+    app_circuit_info JSONB, -- commonproto.AppCircuitInfo received from app prover
     app_proof TEXT NOT NULL DEFAULT '', -- prover GetProofResponse
     gateway_batch_id TEXT NOT NULL DEFAULT '', -- batch_id and nonce are same for all proofs of same reqid
     gateway_request_id TEXT NOT NULL DEFAULT '', -- SendBatchQueriesAsyncResponse.request_ids[idx]

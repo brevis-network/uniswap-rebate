@@ -25,3 +25,22 @@ INSERT INTO claimer (chid, router, evlog) VALUES ($1, $2, $3);
 
 -- name: ClaimerGet :one
 SELECT evlog FROM claimer WHERE chid = $1 and router = $2;
+
+-- name: ProofAdd :exec
+INSERT INTO proof (reqid, idx, app_prover, app_proof_id, app_circuit_info) VALUES ($1, $2, $3, $4, $5);
+
+-- name: ProofSetGwInfo :exec
+UPDATE proof
+SET gateway_batch_id = $1,
+    gateway_request_id = $2,
+    gateway_nonce = $3
+WHERE reqid = $4 AND idx = $5;
+
+-- name: ProofSetAppProof :exec
+UPDATE proof SET app_proof = $1 and app_circuit_info = $2 WHERE app_proof_id = $3;
+
+-- name: ProofSetGwResp :exec
+UPDATE proof SET gateway_query_status = $1 WHERE gateway_request_id = $2 AND gateway_nonce = $3;
+
+-- name: ProofGetIds :many
+SELECT idx, app_proof_id, gateway_batch_id, gateway_request_id, gateway_nonce FROM proof WHERE reqid = $1 ORDER BY idx;
