@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/brevis-network/uniswap-rebate/binding"
+	"github.com/celer-network/goutils/log"
 	"github.com/cockroachdb/cockroach-go/v2/crdb"
 	_ "github.com/lib/pq"
 )
@@ -88,4 +90,20 @@ func ChkQueryRow(err error) (bool, error) {
 		err = nil
 	}
 	return found, err
+}
+
+func (d *DAL) GetPoolKeys(chid uint64, poolidmap binding.PoolIdMap) []binding.PoolKey {
+	var ret []binding.PoolKey
+	for pid := range poolidmap {
+		pk, err := d.PoolGet(context.Background(), PoolGetParams{
+			Chid:   chid,
+			Poolid: "0x" + pid.Hex(),
+		})
+		if err != nil { // could be not in db
+			log.Errorln("PoolGet", pid, "err:", err)
+			continue
+		}
+		ret = append(ret, pk)
+	}
+	return ret
 }

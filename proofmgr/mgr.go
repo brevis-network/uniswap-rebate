@@ -7,13 +7,14 @@ import (
 	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/sdkproto"
 	"github.com/brevis-network/uniswap-rebate/binding"
+	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/celer-network/goutils/log"
 	"google.golang.org/grpc"
 )
 
 const (
-	BrvGwApiKey = ""
+	BrvGwApiKey = "UniGas" // UniGasAgg
 )
 
 type ProofMgr struct {
@@ -82,8 +83,52 @@ func (m *ProofMgr) Run(info *binding.ProofInfo) {
 }
 
 // proofinfo -> list of ProveRequest
-func (m *ProofMgr) BuildProveReqs(info *binding.ProofInfo) []*sdkproto.ProveRequest {
-	return nil
+func (m *ProofMgr) BuildProveReqs(info *binding.ProofInfo) (ret []*sdkproto.ProveRequest) {
+	claimLog := info.Logs[0]
+	swaps := info.Logs[1:]
+	// split swaps into groups without exceeding circuit max. each group needs a separate app proof and gw Query
+	for _, swapGroup := range binding.SplitIntoGroups(swaps, circuit.MaxSwapNum, circuit.MaxPoolNum) {
+		req := &sdkproto.ProveRequest{
+			SrcChainId: info.ChainId,
+		}
+		req.Receipts = append(req.Receipts, evToIndexedReceipt(claimLog, 0))
+		for i, ev := range swapGroup.Logs {
+			req.Receipts = append(req.Receipts, evToIndexedReceipt(ev, i+1))
+		}
+		appCirc := binding.NewCircuit(info, swapGroup.Logs, m.db.GetPoolKeys(info.ChainId, swapGroup.PoolIds))
+		req.CustomInput, _ = buildCustomInput(appCirc)
+		ret = append(ret, req)
+	}
+	return ret
+}
+
+// only topic 1 and topic 2 as fields. both our Claimer and uniswap swap are the same logic
+func evToIndexedReceipt(ev binding.OneLog, index int) *sdkproto.IndexedReceipt {
+	return &sdkproto.IndexedReceipt{
+		Index: uint32(index),
+		Data: &sdkproto.ReceiptData{
+			BlockNum: ev.BlockNumber,
+			TxHash:   ev.TxHash.Hex(),
+			Fields: []*sdkproto.Field{
+				{
+					Contract:   ev.Address.Hex(),
+					LogPos:     uint32(ev.Index - ev.LogIdxOffset),
+					EventId:    ev.Topics[0].Hex(),
+					Value:      ev.Topics[1].Hex(),
+					IsTopic:    true,
+					FieldIndex: 1,
+				},
+				{
+					Contract:   ev.Address.Hex(),
+					LogPos:     uint32(ev.Index - ev.LogIdxOffset),
+					EventId:    ev.Topics[0].Hex(),
+					Value:      ev.Topics[2].Hex(),
+					IsTopic:    true,
+					FieldIndex: 2,
+				},
+			},
+		},
+	}
 }
 
 // call appprover.ProveAsync, save app circuit info and proof id to db
