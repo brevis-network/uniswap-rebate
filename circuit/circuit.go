@@ -25,6 +25,8 @@ var (
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
 	// const
 	zeroB32 = sdk.ConstFromBigEndianBytes([]byte{0})
+	// gas price cap to 50G wei
+	GasPriceCap = sdk.ConstUint248(50_000_000_000)
 )
 
 type GasCircuit struct {
@@ -131,7 +133,13 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		r := in.Receipts.Raw[i+1]
 		// multiply gas by block base fee and add to total, if not last swap, toAdd is 0 so no change
 		// Note for dummy receipts, corresponding TxGasCap should all be 0 so toAdd is also 0
-		totalRebate = api.Uint248.Add(totalRebate, api.Uint248.Mul(api.ToUint248(toAdd), r.BlockBaseFee))
+		// gasPrice is min(actual, gasPriceCap)
+		gasPrice := api.Uint248.Select(
+			api.Uint248.IsLessThan(r.BlockBaseFee, GasPriceCap),
+			r.BlockBaseFee,
+			GasPriceCap,
+		)
+		totalRebate = api.Uint248.Add(totalRebate, api.Uint248.Mul(api.ToUint248(toAdd), gasPrice))
 		// if lastSwap, reset curTxGas to 0 for new tx next
 		curTxGas = api.Uint32.Select(
 			lastSwap,
