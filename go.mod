@@ -5,7 +5,7 @@ go 1.22.0
 toolchain go1.22.11
 
 require (
-	github.com/brevis-network/brevis-sdk v0.3.33
+	github.com/brevis-network/brevis-sdk v0.3.34-0.20250612043851-bb89d1f12e26
 	github.com/cockroachdb/cockroach-go/v2 v2.3.8
 	github.com/ethereum/go-ethereum v1.14.8
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.25.1
