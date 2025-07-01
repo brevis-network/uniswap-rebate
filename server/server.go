@@ -104,8 +104,8 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 		ret.Errmsg = "db ReqAdd err: " + err.Error()
 		return
 	}
-
-	// enqueue
+	// start proving
+	go prMgr.Run(&info)
 
 	// good to return
 	return ret, nil

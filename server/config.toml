@@ -1,7 +1,10 @@
 db = "localhost:26257"
 httpport = 9002 # serving rest apis
-# send reqs to prove server which generates app proof then submit to brv gateway
-prover = "http://localhost:9003"
+brvgw = "52.13.236.124:11080" # dns:port or ip:port of brevis gateway
+# list of app provers, each runs prover/main.go 
+prover = ["localhost:9001"]
+# chainid of gas rebate contract, should be 130 Unichain mainnet for prod
+dstchid = 130
 
 [[multichain]]
 chainID = 11155111

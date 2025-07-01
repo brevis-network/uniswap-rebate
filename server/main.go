@@ -9,6 +9,7 @@ import (
 
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/brevis-network/uniswap-rebate/onchain"
+	"github.com/brevis-network/uniswap-rebate/proofmgr"
 	"github.com/brevis-network/uniswap-rebate/webapi"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/spf13/viper"
@@ -18,6 +19,7 @@ var (
 	fcfg = flag.String("c", "config.toml", "config toml file")
 	// chainid -> onechain
 	chainMap map[uint64]*onchain.OneChain
+	prMgr    *proofmgr.ProofMgr
 )
 
 func main() {
@@ -29,6 +31,8 @@ func main() {
 	// setup db
 	db, err := dal.NewDAL(viper.GetString("db"))
 	chkErr(err, "new dal")
+
+	prMgr = proofmgr.NewProofMgr(viper.GetString("brvgw"), viper.GetStringSlice("prover"), viper.GetUint64("dstchid"), db)
 
 	chainMap = make(map[uint64]*onchain.OneChain)
 	cfgs := onchain.GetMcc("multichain")
