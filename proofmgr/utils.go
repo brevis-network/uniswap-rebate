@@ -11,6 +11,7 @@ import (
 	"github.com/brevis-network/brevis-sdk/sdk/proto/commonproto"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/sdkproto"
+	"github.com/brevis-network/uniswap-rebate/binding"
 
 	"github.com/celer-network/goutils/log"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -64,6 +65,35 @@ func buildCustomInput(appCircuit sdk.AppCircuit) (*sdkproto.CustomInput, error) 
 	}
 
 	return &sdkproto.CustomInput{JsonBytes: string(jsonBytes)}, nil
+}
+
+// only topic 1 and topic 2 as fields. both our Claimer and uniswap swap are the same logic
+func evToIndexedReceipt(ev binding.OneLog, index int) *sdkproto.IndexedReceipt {
+	return &sdkproto.IndexedReceipt{
+		Index: uint32(index),
+		Data: &sdkproto.ReceiptData{
+			BlockNum: ev.BlockNumber,
+			TxHash:   ev.TxHash.Hex(),
+			Fields: []*sdkproto.Field{
+				{
+					Contract:   ev.Address.Hex(),
+					LogPos:     uint32(ev.Index - ev.LogIdxOffset),
+					EventId:    ev.Topics[0].Hex(),
+					Value:      ev.Topics[1].Hex(),
+					IsTopic:    true,
+					FieldIndex: 1,
+				},
+				{
+					Contract:   ev.Address.Hex(),
+					LogPos:     uint32(ev.Index - ev.LogIdxOffset),
+					EventId:    ev.Topics[0].Hex(),
+					Value:      ev.Topics[2].Hex(),
+					IsTopic:    true,
+					FieldIndex: 2,
+				},
+			},
+		},
+	}
 }
 
 func convertSDKStorageToProtoStorage(storage sdk.StorageData) *sdkproto.StorageData {

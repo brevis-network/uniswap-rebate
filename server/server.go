@@ -62,6 +62,11 @@ func (s *Server) NewProof(ctx context.Context, req *webapi.NewProofReq) (ret *we
 		ret.Errmsg = "no eligible swaps found for " + router
 		return
 	}
+	// temp for now, will remove once we properly support agg proofs
+	if len(swaps) > circuit.MaxSwapNum {
+		ret.Errmsg = fmt.Sprintf("found %d swaps, exceeds max %d", len(swaps), circuit.MaxSwapNum)
+		return
+	}
 	// Circuit supports up to MaxSwaps and MaxPoolNum
 	// so we need to split into multiple requests if logs has more. Note we have to keep all swaps exactly ordered as onchain de-dup is by blknum
 	// all swaps happen in same blk must be in one batch, so if MaxPool is 32 and within one block there are swaps with more than 32 pools

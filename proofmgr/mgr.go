@@ -10,6 +10,7 @@ import (
 	"github.com/brevis-network/uniswap-rebate/circuit"
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/celer-network/goutils/log"
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/grpc"
 )
 
@@ -38,8 +39,7 @@ func NewProofMgr(gwrpc string, appProvers []string, dstChId uint64, db *dal.DAL)
 // 1. ProofInfo -> []sdkproto.ProveRequest. one ProveRequest corresponds to one app proof and one gw Query
 // 2. iter reqs. send to app prover and save appCircuitInfo
 // 3. build Queries from reqs and received appCircuitInfo, call gw.SendBatchQueriesAsync
-// 4. for each req, polling app proof and gw query to see if both are ready
-// 5. if yes, call gw.SubmitAppProof
+// 4. for each req, polling app proof and gw query until both are ready, then call gw.SubmitAppProof, and polling gw till final proof
 func (m *ProofMgr) Run(info *binding.ProofInfo) {
 	sdkreqs := m.BuildProveReqs(info)
 	var appInfos []*commonproto.AppCircuitInfo
@@ -79,7 +79,17 @@ func (m *ProofMgr) Run(info *binding.ProofInfo) {
 			Idx:              idx,        // nth proof/query for this Reqid
 		})
 	}
-	// block parallel polling app prover status and gw
+	// get all proof ids about this request and block polling app prover status and gw
+	var errG errgroup.Group
+	rows, _ := m.db.ProofGetIds(context.Background(), info.ReqId)
+	for _, row := range rows {
+		errG.Go(func() error {
+			return m.DoOneProof(row)
+		})
+	}
+	if err := errG.Wait(); err != nil {
+		log.Error("errG wait err:", err)
+	}
 }
 
 // proofinfo -> list of ProveRequest
@@ -100,35 +110,6 @@ func (m *ProofMgr) BuildProveReqs(info *binding.ProofInfo) (ret []*sdkproto.Prov
 		ret = append(ret, req)
 	}
 	return ret
-}
-
-// only topic 1 and topic 2 as fields. both our Claimer and uniswap swap are the same logic
-func evToIndexedReceipt(ev binding.OneLog, index int) *sdkproto.IndexedReceipt {
-	return &sdkproto.IndexedReceipt{
-		Index: uint32(index),
-		Data: &sdkproto.ReceiptData{
-			BlockNum: ev.BlockNumber,
-			TxHash:   ev.TxHash.Hex(),
-			Fields: []*sdkproto.Field{
-				{
-					Contract:   ev.Address.Hex(),
-					LogPos:     uint32(ev.Index - ev.LogIdxOffset),
-					EventId:    ev.Topics[0].Hex(),
-					Value:      ev.Topics[1].Hex(),
-					IsTopic:    true,
-					FieldIndex: 1,
-				},
-				{
-					Contract:   ev.Address.Hex(),
-					LogPos:     uint32(ev.Index - ev.LogIdxOffset),
-					EventId:    ev.Topics[0].Hex(),
-					Value:      ev.Topics[2].Hex(),
-					IsTopic:    true,
-					FieldIndex: 2,
-				},
-			},
-		},
-	}
 }
 
 // call appprover.ProveAsync, save app circuit info and proof id to db
@@ -153,7 +134,7 @@ func (m *ProofMgr) DoAppProveAsync(reqid int64, idx int, appProver string, prove
 	return proverResp.CircuitInfo, err
 }
 
-// BlockPolling for one app prover and gw query, will return if both are true
-func (m *ProofMgr) BlockPolling(appProofId, gwReqId string, gwNonce uint64) {
-
+// BLOCKING. polling app proof and gw query until both are ready, then call gw.SubmitAppProof, and polling gw till final proof
+func (m *ProofMgr) DoOneProof(row dal.ProofGetIdsRow) error {
+	return nil
 }

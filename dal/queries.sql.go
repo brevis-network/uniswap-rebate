@@ -159,11 +159,12 @@ func (q *Queries) ProofAdd(ctx context.Context, arg ProofAddParams) error {
 }
 
 const proofGetIds = `-- name: ProofGetIds :many
-SELECT idx, app_proof_id, gateway_batch_id, gateway_request_id, gateway_nonce FROM proof WHERE reqid = $1 ORDER BY idx
+SELECT idx, app_prover, app_proof_id, gateway_batch_id, gateway_request_id, gateway_nonce FROM proof WHERE reqid = $1 ORDER BY idx
 `
 
 type ProofGetIdsRow struct {
 	Idx              int    `json:"idx"`
+	AppProver        string `json:"appProver"`
 	AppProofID       string `json:"appProofId"`
 	GatewayBatchID   string `json:"gatewayBatchId"`
 	GatewayRequestID string `json:"gatewayRequestId"`
@@ -181,6 +182,7 @@ func (q *Queries) ProofGetIds(ctx context.Context, reqid int64) ([]ProofGetIdsRo
 		var i ProofGetIdsRow
 		if err := rows.Scan(
 			&i.Idx,
+			&i.AppProver,
 			&i.AppProofID,
 			&i.GatewayBatchID,
 			&i.GatewayRequestID,

@@ -43,4 +43,4 @@ UPDATE proof SET app_proof = $1 and app_circuit_info = $2 WHERE app_proof_id = $
 UPDATE proof SET gateway_query_status = $1 WHERE gateway_request_id = $2 AND gateway_nonce = $3;
 
 -- name: ProofGetIds :many
-SELECT idx, app_proof_id, gateway_batch_id, gateway_request_id, gateway_nonce FROM proof WHERE reqid = $1 ORDER BY idx;
+SELECT idx, app_prover, app_proof_id, gateway_batch_id, gateway_request_id, gateway_nonce FROM proof WHERE reqid = $1 ORDER BY idx;
