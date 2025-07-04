@@ -16,7 +16,7 @@ overrides:
     column: "pools.chid"
   - go_type: "github.com/brevis-network/uniswap-rebate/binding.PoolKey"
     column: "pools.poolkey"
-  - go_type: "github.com/brevis-network/uniswap-rebate/binding.CallData"
+  - go_type: "*github.com/brevis-network/uniswap-rebate/webapi.CallData"
     column: "reqs.calldata"
   - go_type: "*github.com/brevis-network/uniswap-rebate/webapi.NewProofReq"
     column: "reqs.usr_req"

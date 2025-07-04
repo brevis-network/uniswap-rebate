@@ -20,6 +20,9 @@ INSERT INTO reqs (id, router, usr_req, proof_info) VALUES ($1, $2, $3, $4);
 -- name: ReqGetCalldata :one
 SELECT calldata FROM reqs WHERE id = $1;
 
+-- name: ReqSetCalldata :exec
+UPDATE reqs SET calldata = $1 WHERE id = $2;
+
 -- name: ClaimerAdd :exec
 INSERT INTO claimer (chid, router, evlog) VALUES ($1, $2, $3);
 

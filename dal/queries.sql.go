@@ -283,9 +283,23 @@ const reqGetCalldata = `-- name: ReqGetCalldata :one
 SELECT calldata FROM reqs WHERE id = $1
 `
 
-func (q *Queries) ReqGetCalldata(ctx context.Context, id int64) (binding.CallData, error) {
+func (q *Queries) ReqGetCalldata(ctx context.Context, id int64) (*webapi.CallData, error) {
 	row := q.db.QueryRowContext(ctx, reqGetCalldata, id)
-	var calldata binding.CallData
+	var calldata *webapi.CallData
 	err := row.Scan(&calldata)
 	return calldata, err
+}
+
+const reqSetCalldata = `-- name: ReqSetCalldata :exec
+UPDATE reqs SET calldata = $1 WHERE id = $2
+`
+
+type ReqSetCalldataParams struct {
+	Calldata *webapi.CallData `json:"calldata"`
+	ID       int64            `json:"id"`
+}
+
+func (q *Queries) ReqSetCalldata(ctx context.Context, arg ReqSetCalldataParams) error {
+	_, err := q.db.ExecContext(ctx, reqSetCalldata, arg.Calldata, arg.ID)
+	return err
 }

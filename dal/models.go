@@ -48,5 +48,5 @@ type Req struct {
 	Step      int32               `json:"step"`
 	UsrReq    *webapi.NewProofReq `json:"usrReq"`
 	ProofInfo binding.ProofInfo   `json:"proofInfo"`
-	Calldata  binding.CallData    `json:"calldata"`
+	Calldata  *webapi.CallData    `json:"calldata"`
 }

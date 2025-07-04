@@ -107,6 +107,7 @@ require (
 	github.com/ingonyama-zk/icicle/v2 v2.0.3 // indirect
 	github.com/jedib0t/go-pretty/v6 v6.5.4 // indirect
 	github.com/julienschmidt/httprouter v1.3.0
+	github.com/lthibault/jitterbug/v2 v2.2.2
 	github.com/mattn/go-colorable v0.1.13 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.15 // indirect

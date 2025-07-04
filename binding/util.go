@@ -4,8 +4,6 @@ import (
 	"database/sql/driver"
 	"encoding/hex"
 	"encoding/json"
-
-	"github.com/brevis-network/uniswap-rebate/webapi"
 )
 
 func (k PoolKey) Value() (driver.Value, error) {
@@ -24,6 +22,7 @@ func (k *ClaimHelpClaimer) Scan(value interface{}) error {
 	return json.Unmarshal(value.([]byte), k)
 }
 
+/*
 // to be saved in db. fields are args for ClaimWithZkProofs
 type CallData struct {
 	ProofIds          [][32]byte
@@ -52,6 +51,7 @@ func (d *CallData) ToWebCallData() *webapi.CallData {
 	}
 	return ret
 }
+*/
 
 // []byte or fixed length array [32]byte or [20]byte, has 0x prefix
 func ToHex[T ~[]byte | ~[32]byte | ~[20]byte](input T) string {

@@ -125,6 +125,6 @@ func (s *Server) GetProof(ctx context.Context, req *webapi.GetProofReq) (*webapi
 		return ret, err
 	}
 	// ret.Status
-	ret.Calldata = calldata.ToWebCallData()
+	ret.Calldata = calldata
 	return ret, nil
 }
