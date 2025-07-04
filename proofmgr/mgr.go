@@ -145,10 +145,11 @@ func (m *ProofMgr) DoOneProof(reqid int64, row dal.ProofGetIdsRow) error {
 		30*time.Second,
 		&jitterbug.Norm{Stdev: 10 * time.Second},
 	)
+	defer t.Stop() // avoid mem leak
 	for range t.C {
 		resp, _ := client.GetProof(context.Background(), &sdkproto.GetProofRequest{ProofId: row.AppProofID})
 		if len(resp.Proof) == 0 {
-			continue // try again later
+			continue // try again next tick
 		}
 		// save app proof
 		m.db.ProofSetAppProof(context.Background(), dal.ProofSetAppProofParams{
