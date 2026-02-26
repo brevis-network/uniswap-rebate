@@ -9,3 +9,4 @@ evm_version = "cancun"
 [etherscan]
 sepolia = { key = "K26KZ6WB4CYCVNHMEFFWWT9YG23DCIGW15" }
 base-sepolia = { key = "I7ZUGAX95JXEYV6CNBGUYQMS6641FFCG4T" }
+unichain = { key = "R2EIVWVJMS7SN14GBMHNWDFKGQ735PDR93", chain = "130", url = "https://api.uniscan.xyz/api" }
