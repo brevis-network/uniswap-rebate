@@ -15,22 +15,24 @@ import (
 )
 
 const claimerAdd = `-- name: ClaimerAdd :exec
-INSERT INTO claimer (chid, router, evlog) VALUES ($1, $2, $3)
+INSERT INTO claimer (chid, router, beneficiary) VALUES ($1, $2, $3)
+ON CONFLICT (chid, router) DO UPDATE
+SET beneficiary = excluded.beneficiary
 `
 
 type ClaimerAddParams struct {
-	Chid   uint64                   `json:"chid"`
-	Router string                   `json:"router"`
-	Evlog  binding.ClaimHelpClaimer `json:"evlog"`
+	Chid        uint64 `json:"chid"`
+	Router      string `json:"router"`
+	Beneficiary string `json:"beneficiary"`
 }
 
 func (q *Queries) ClaimerAdd(ctx context.Context, arg ClaimerAddParams) error {
-	_, err := q.db.ExecContext(ctx, claimerAdd, arg.Chid, arg.Router, arg.Evlog)
+	_, err := q.db.ExecContext(ctx, claimerAdd, arg.Chid, arg.Router, arg.Beneficiary)
 	return err
 }
 
 const claimerGet = `-- name: ClaimerGet :one
-SELECT evlog FROM claimer WHERE chid = $1 and router = $2
+SELECT beneficiary, fetch_blk FROM claimer WHERE chid = $1 and router = $2
 `
 
 type ClaimerGetParams struct {
@@ -38,11 +40,65 @@ type ClaimerGetParams struct {
 	Router string `json:"router"`
 }
 
-func (q *Queries) ClaimerGet(ctx context.Context, arg ClaimerGetParams) (binding.ClaimHelpClaimer, error) {
+type ClaimerGetRow struct {
+	Beneficiary string `json:"beneficiary"`
+	FetchBlk    uint64 `json:"fetchBlk"`
+}
+
+func (q *Queries) ClaimerGet(ctx context.Context, arg ClaimerGetParams) (ClaimerGetRow, error) {
 	row := q.db.QueryRowContext(ctx, claimerGet, arg.Chid, arg.Router)
-	var evlog binding.ClaimHelpClaimer
-	err := row.Scan(&evlog)
-	return evlog, err
+	var i ClaimerGetRow
+	err := row.Scan(&i.Beneficiary, &i.FetchBlk)
+	return i, err
+}
+
+const claimerSetFetchBlk = `-- name: ClaimerSetFetchBlk :exec
+UPDATE claimer
+SET fetch_blk = GREATEST(fetch_blk, $1)
+WHERE chid = $2 AND router = $3
+`
+
+type ClaimerSetFetchBlkParams struct {
+	FetchBlk uint64 `json:"fetchBlk"`
+	Chid     uint64 `json:"chid"`
+	Router   string `json:"router"`
+}
+
+func (q *Queries) ClaimerSetFetchBlk(ctx context.Context, arg ClaimerSetFetchBlkParams) error {
+	_, err := q.db.ExecContext(ctx, claimerSetFetchBlk, arg.FetchBlk, arg.Chid, arg.Router)
+	return err
+}
+
+const claimers = `-- name: Claimers :many
+SELECT chid, router, beneficiary, fetch_blk FROM claimer ORDER BY chid, router
+`
+
+func (q *Queries) Claimers(ctx context.Context) ([]Claimer, error) {
+	rows, err := q.db.QueryContext(ctx, claimers)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Claimer
+	for rows.Next() {
+		var i Claimer
+		if err := rows.Scan(
+			&i.Chid,
+			&i.Router,
+			&i.Beneficiary,
+			&i.FetchBlk,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const monGet = `-- name: MonGet :one
@@ -202,7 +258,7 @@ func (q *Queries) ProofGetIds(ctx context.Context, reqid int64) ([]ProofGetIdsRo
 }
 
 const proofSetAppProof = `-- name: ProofSetAppProof :exec
-UPDATE proof SET app_proof = $1 and app_circuit_info = $2 WHERE app_proof_id = $3
+UPDATE proof SET app_proof = $1, app_circuit_info = $2 WHERE app_proof_id = $3
 `
 
 type ProofSetAppProofParams struct {

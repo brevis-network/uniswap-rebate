@@ -3,12 +3,14 @@ package onchain
 import (
 	"context"
 	"fmt"
+	"math/big"
 	"slices"
 	"time"
 
 	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/celer-network/goutils/eth/mon2"
+	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
@@ -66,6 +68,18 @@ func NewOneChain(cfg *OneChainConfig, dal *dal.DAL) (*OneChain, error) {
 
 func (c *OneChain) Close() {
 	c.mon.Close()
+}
+
+// LatestSafeBlock returns latest block minus configured delay.
+func (c *OneChain) LatestSafeBlock(ctx context.Context) (uint64, error) {
+	curBlkNum, err := c.ec.BlockNumber(ctx)
+	if err != nil {
+		return 0, err
+	}
+	if curBlkNum <= c.BlkDelay {
+		return 0, nil
+	}
+	return curBlkNum - c.BlkDelay, nil
 }
 
 // txlist is hex string of tx hash, return non-nil err if any TransactionReceipt has err
@@ -149,6 +163,57 @@ func (c *OneChain) ProcessReceipts(receipts []*types.Receipt, sender common.Addr
 		}
 	}
 	return logs, nil
+}
+
+// fetch all swap logs of one router within [fromBlk, toBlk], then load tx receipts and apply pool eligibility checks.
+func (c *OneChain) FetchRouterSwaps(router common.Address, fromBlk, toBlk uint64) ([]binding.OneLog, error) {
+	if fromBlk > toBlk {
+		return nil, nil
+	}
+	logs, err := c.ec.FilterLogs(context.Background(), ethereum.FilterQuery{
+		FromBlock: big.NewInt(int64(fromBlk)),
+		ToBlock:   big.NewInt(int64(toBlk)),
+		Addresses: []common.Address{Hex2addr(c.PoolMgr)},
+		Topics: [][]common.Hash{
+			{Hex2hash(SwapEvId)},            // event id
+			nil,                             // poolid
+			{common.BytesToHash(router[:])}, // sender
+		},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("FilterLogs err: %w", err)
+	}
+	if len(logs) == 0 {
+		return nil, nil
+	}
+
+	// dedup tx hashes first to reduce receipt rpc calls.
+	txMap := make(map[common.Hash]bool)
+	for _, l := range logs {
+		txMap[l.TxHash] = true
+	}
+	receipts := make([]*types.Receipt, 0, len(txMap))
+	for txhash := range txMap {
+		r, err := c.ec.TransactionReceipt(context.Background(), txhash)
+		if err != nil {
+			return nil, fmt.Errorf("TransactionReceipt(%s) err: %w", txhash.Hex(), err)
+		}
+		receipts = append(receipts, r)
+	}
+	// ProcessReceipts expects ordered receipts.
+	slices.SortFunc(receipts, func(a, b *types.Receipt) int {
+		blockNumCmp := a.BlockNumber.Cmp(b.BlockNumber)
+		if blockNumCmp != 0 {
+			return blockNumCmp
+		}
+		if a.TransactionIndex < b.TransactionIndex {
+			return -1
+		} else if a.TransactionIndex > b.TransactionIndex {
+			return 1
+		}
+		return 0
+	})
+	return c.ProcessReceipts(receipts, router)
 }
 
 /*

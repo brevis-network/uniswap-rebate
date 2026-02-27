@@ -5,6 +5,8 @@ brvgw = "52.13.236.124:11080" # dns:port or ip:port of brevis gateway
 prover = ["localhost:9001"]
 # chainid of gas rebate contract, should be 130 Unichain mainnet for prod
 dstchid = 130
+beneficiary_registry = "0x0000000000000000000000000000000000000000"
+prove_interval = "5m"
 
 [[multichain]]
 chainID = 11155111
@@ -16,4 +18,16 @@ BlkDelay = 2
 GasPerSwap = 80000
 GasPerTx = 80000
 PoolMgr = "0x8C4BcBE6b9eF47855f97E675296FA3F6fafa5F1A"
+VkHash = ""
+
+[[multichain]]
+chainID = 130
+name = "Unichain"
+gateway = "https://mainnet.unichain.org"
+BlkInterval = 12
+BlkDelay = 2
+
+GasPerSwap = 80000
+GasPerTx = 80000
+PoolMgr = "0x0000000000000000000000000000000000000000"
 VkHash = ""

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/brevis-network/uniswap-rebate/onchain"
@@ -41,14 +42,29 @@ func main() {
 		chkErr(err, "NewOneChain"+cfg.Name)
 		chainMap[cfg.ChainID] = onec
 		onec.MonPoolInit()
-		onec.MonClaimer()
 	}
+
+	registryAddr := viper.GetString("beneficiary_registry")
+	if registryAddr == "" {
+		log.Fatalln("missing beneficiary_registry config")
+	}
+	dstChid := viper.GetUint64("dstchid")
+	dstChain, ok := chainMap[dstChid]
+	if !ok {
+		log.Fatalf("dst chain %d must be configured in multichain for registry monitor", dstChid)
+	}
+	dstChain.MonBeneficiarySet(onchain.Hex2addr(registryAddr))
+
+	srv := &Server{db: db}
+	intv := viper.GetDuration("prove_interval")
+	if intv <= 0 {
+		intv = 5 * time.Minute
+	}
+	go srv.RunScheduledProver(context.Background(), intv)
 
 	// grcp-gateway for http apis
 	mux := runtime.NewServeMux()
-	err = webapi.RegisterUniRebateHandlerServer(context.Background(), mux, &Server{
-		db: db,
-	})
+	err = webapi.RegisterUniRebateHandlerServer(context.Background(), mux, srv)
 	chkErr(err, "gw register")
 	// blocking and proxy http to grpc server
 	http.ListenAndServe(fmt.Sprintf(":%d", viper.GetInt("httpport")), mux)

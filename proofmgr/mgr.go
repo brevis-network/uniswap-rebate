@@ -97,16 +97,13 @@ func (m *ProofMgr) Run(info *binding.ProofInfo) {
 
 // proofinfo -> list of ProveRequest
 func (m *ProofMgr) BuildProveReqs(info *binding.ProofInfo) (ret []*sdkproto.ProveRequest) {
-	claimLog := info.Logs[0]
-	swaps := info.Logs[1:]
 	// split swaps into groups without exceeding circuit max. each group needs a separate app proof and gw Query
-	for _, swapGroup := range binding.SplitIntoGroups(swaps, circuit.MaxSwapNum, circuit.MaxPoolNum) {
+	for _, swapGroup := range binding.SplitIntoGroups(info.Logs, circuit.MaxSwapNum, circuit.MaxPoolNum) {
 		req := &sdkproto.ProveRequest{
 			SrcChainId: info.ChainId,
 		}
-		req.Receipts = append(req.Receipts, evToIndexedReceipt(claimLog, 0))
 		for i, ev := range swapGroup.Logs {
-			req.Receipts = append(req.Receipts, evToIndexedReceipt(ev, i+1))
+			req.Receipts = append(req.Receipts, evToIndexedReceipt(ev, i))
 		}
 		appCirc := binding.NewCircuit(info, swapGroup.Logs, m.db.GetPoolKeys(info.ChainId, swapGroup.PoolIds))
 		req.CustomInput, _ = buildCustomInput(appCirc)

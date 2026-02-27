@@ -25,6 +25,7 @@ func TestCompile(t *testing.T) {
 }
 
 func TestCircuit(t *testing.T) {
+	t.Skip("requires live rpc + gateway setup")
 	app, _ := sdk.NewBrevisApp(1, "", "")
 	// ========== receipts
 	// first 2 receipts from same block

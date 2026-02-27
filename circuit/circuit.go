@@ -10,17 +10,12 @@ import (
 const (
 	MaxPoolNum  = 32
 	MaxReceipts = 1024
-	MaxSwapNum  = MaxReceipts - 1 // need 1 for claimer
+	MaxSwapNum  = MaxReceipts
 
 	maxU32 uint32 = math.MaxUint32
-	// create2 guarantee same addr on every chain
-	ClaimHelp = "0x112233C73c74a810BA963171ADc431A60e051D38"
 )
 
 var (
-	// single event that tells us router and claimer address, event is Claimer(address,address)
-	EventIdClaimer = sdk.ParseEventID(Hex2Bytes("0xf0d796bb38c321bf748f9334d1b7b16ba5fb79e2112396aa77c47cd5d21a8b2f"))
-	ClaimHelpAddr  = sdk.ConstUint248(Hex2Bytes(ClaimHelp))
 	// all swaps of same router
 	EventIdSwap = sdk.ParseEventID(Hex2Bytes("0x40e9cecb9f5f1f1c5b9c97dec2917b7ee92e57ba5563708daca94dd84ad7112f"))
 	// const
@@ -30,6 +25,7 @@ var (
 )
 
 type GasCircuit struct {
+	ChainId sdk.Uint64
 	PoolMgr sdk.Uint248                 // PoolManager addr
 	PoolKey [MaxPoolNum * 5]sdk.Bytes32 // each poolkey has 5 fields, poolid = keccak(abi.encode(poolkey))
 	// gas rebate of one swap event and per tx.
@@ -44,7 +40,6 @@ func (c *GasCircuit) Allocate() (maxReceipts, maxStorage, maxTransactions int) {
 	return MaxReceipts, 0, 0
 }
 
-// receipt[0] is claimer event, [1:] are all swaps
 // one swap receipt has 2 fields, poolid and sender from the same swap log
 func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 	// each receipt must be unique
@@ -63,16 +58,12 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		)
 	}
 
-	// check first receipt is Claimer
-	claimEv := in.Receipts.Raw[0]
-	api.Uint248.AssertIsEqual(claimEv.Fields[0].Contract, ClaimHelpAddr)
-	api.Uint248.AssertIsEqual(claimEv.Fields[0].EventID, EventIdClaimer)
-	router := api.ToUint248(claimEv.Fields[0].Value)
-	claimer := api.ToUint248(claimEv.Fields[1].Value)
+	// sender topic of first swap log
+	router := api.ToUint248(in.Receipts.Raw[0].Fields[1].Value)
 
-	// build datastream for all swaps, limited by sdk api, have to create for all receipts first then [1:]
-	receipts := sdk.NewDataStream(api, in.Receipts)
-	swaps := sdk.RangeUnderlying(receipts, 1, MaxReceipts)
+	// build datastream for all swaps
+	swaps := sdk.NewDataStream(api, in.Receipts)
+	// swaps := sdk.RangeUnderlying(receipts, 0, MaxReceipts)
 	// for each swap, ensure it's expected and eligible
 	sdk.AssertEach(swaps, func(r sdk.Receipt) sdk.Uint248 {
 		isSwap := api.Uint248.And(
@@ -94,12 +85,12 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		return api.Uint248.And(isSwap, api.ToUint248(eligible))
 	})
 
-	// if TxGasCap[i] is 0, check current receipt has same blknum and mpt as next receipt. no need to check last receipt
-	for i := 1; i < MaxSwapNum; i++ {
+	// if TxGasCap[i] is 0, check receipt i and i+1 are from same tx. no need to check last receipt.
+	for i := 0; i < MaxSwapNum-1; i++ {
 		cur := in.Receipts.Raw[i]
 		next := in.Receipts.Raw[i+1]
 		api.Uint32.AssertIsEqual(api.Uint32.Select(
-			api.Uint32.IsZero(c.TxGasCap[i-1]), // TxGasCap index is 1 less than receipt
+			api.Uint32.IsZero(c.TxGasCap[i]),
 			api.Uint32.And(
 				api.Uint32.IsEqual(cur.BlockNum, next.BlockNum),
 				api.Uint32.IsEqual(cur.MptKeyPath, next.MptKeyPath)),
@@ -129,8 +120,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 			c.TxGasCap[i],
 		)
 
-		// first receipt is claimer so swap starts from 1 but TxGasCap starts from 0
-		r := in.Receipts.Raw[i+1]
+		r := in.Receipts.Raw[i]
 		// multiply gas by block base fee and add to total, if not last swap, toAdd is 0 so no change
 		// Note for dummy receipts, corresponding TxGasCap should all be 0 so toAdd is also 0
 		// gasPrice is min(actual, gasPriceCap)
@@ -163,9 +153,9 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 		)
 	})
 
-	// output router and claimer address
+	// output router and source chain id
+	api.OutputUint64(64, c.ChainId)
 	api.OutputAddress(router)
-	api.OutputAddress(claimer)
 
 	api.OutputUint32(32, sdk.ConstUint32(0)) // fill 0 as contract expects 8 bytes blknum
 	api.OutputUint32(32, minBlk)
@@ -177,6 +167,7 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 
 func DefaultCircuit() *GasCircuit {
 	ret := &GasCircuit{
+		ChainId:    sdk.ConstUint64(0),
 		PoolMgr:    sdk.ConstUint248(0),
 		GasPerSwap: sdk.ConstUint32(0),
 		GasPerTx:   sdk.ConstUint32(0),

@@ -12,9 +12,10 @@ import (
 )
 
 type Claimer struct {
-	Chid   uint64                   `json:"chid"`
-	Router string                   `json:"router"`
-	Evlog  binding.ClaimHelpClaimer `json:"evlog"`
+	Chid        uint64 `json:"chid"`
+	Router      string `json:"router"`
+	Beneficiary string `json:"beneficiary"`
+	FetchBlk    uint64 `json:"fetchBlk"`
 }
 
 type Monitor struct {

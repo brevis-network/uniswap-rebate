@@ -23,8 +23,7 @@ type OneProveReq struct {
 	// unique poolkeys from logs
 	PoolKey []binding.PoolKey
 
-	// circuit input receipts, first is claimer, rest are swaps
-	// all Swap logs have same sender, sorted by blknum
+	// circuit input receipts, all are swaps of the same router, sorted by blknum
 	// swaps from same tx must be together (ok to re-order)
 	Logs []binding.OneLog
 
@@ -35,6 +34,7 @@ type OneProveReq struct {
 // create circuit obj from prove req, used by prover
 func (r *OneProveReq) NewCircuit() *circuit.GasCircuit {
 	ret := circuit.DefaultCircuit()
+	ret.ChainId = sdk.ConstUint64(r.ChainId)
 	ret.PoolMgr = sdk.ConstUint248(Hex2Bytes(r.PoolMgr))
 	ret.GasPerSwap = sdk.ConstUint32(r.GasPerSwap)
 	ret.GasPerTx = sdk.ConstUint32(r.GasPerTx)
@@ -52,8 +52,7 @@ func (r *OneProveReq) NewCircuit() *circuit.GasCircuit {
 		ret.PoolKey[idx+3] = sdk.ConstFromBigEndianBytes(poolkey.TickSpacing.Bytes())
 		ret.PoolKey[idx+4] = sdk.ConstFromBigEndianBytes(poolkey.Hooks[:])
 	}
-	// skip first Claim ev
-	for i, swap := range r.Logs[1:] {
+	for i, swap := range r.Logs {
 		ret.TxGasCap[i] = sdk.ConstUint32(swap.TxGasCap)
 	}
 	return ret
