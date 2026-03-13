@@ -18,10 +18,9 @@ type OneChainConfig struct {
 	BlkInterval, BlkDelay        uint64
 	MaxBlkDelta, ForwardBlkDelay uint64
 
-	// GasPerSwap may be per poolid
 	GasPerSwap, GasPerTx uint32
-	// uni v4 poolmgr and our price oracle
-	PoolMgr, Oracle string
+	// uni v4 poolmgr
+	PoolMgr string
 	// vk hash
 	VkHash string
 }
