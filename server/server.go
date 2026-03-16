@@ -91,7 +91,8 @@ func (s *Server) runOneRouter(ctx context.Context, row dal.Claimer) {
 	}
 
 	router := onchain.Hex2addr(row.Router)
-	swaps, err := onec.FetchRouterSwaps(router, fromBlk, safeBlk)
+	// todo: proper end block
+	swaps, err := onec.FetchRouterSwaps(router, fromBlk, fromBlk+100)
 	if err != nil {
 		log.Errorf("FetchRouterSwaps chain %d router %s [%d,%d] err: %v", row.Chid, row.Router, fromBlk, safeBlk, err)
 		return
@@ -120,16 +121,17 @@ func (s *Server) runOneRouter(ctx context.Context, row dal.Claimer) {
 		log.Infof("start proving reqid %d chain %d router %s swaps %d", reqid, row.Chid, row.Router, len(swaps))
 		go prMgr.Run(&info)
 	}
-
-	// processed this range, move cursor forward regardless of swaps found.
-	err = s.db.ClaimerSetFetchBlk(ctx, dal.ClaimerSetFetchBlkParams{
-		FetchBlk: safeBlk,
-		Chid:     row.Chid,
-		Router:   row.Router,
-	})
-	if err != nil {
-		log.Errorf("ClaimerSetFetchBlk chain %d router %s err: %v", row.Chid, row.Router, err)
-	}
+	/*
+		// processed this range, move cursor forward regardless of swaps found.
+		err = s.db.ClaimerSetFetchBlk(ctx, dal.ClaimerSetFetchBlkParams{
+			FetchBlk: safeBlk,
+			Chid:     row.Chid,
+			Router:   row.Router,
+		})
+		if err != nil {
+			log.Errorf("ClaimerSetFetchBlk chain %d router %s err: %v", row.Chid, row.Router, err)
+		}
+	*/
 }
 
 func filterOversizedBlocks(swaps []binding.OneLog) []binding.OneLog {
