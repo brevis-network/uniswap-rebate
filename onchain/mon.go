@@ -2,6 +2,7 @@ package onchain
 
 import (
 	"context"
+	"errors"
 
 	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/dal"
@@ -57,31 +58,14 @@ func (c *OneChain) MonPoolInit() {
 			log.Error("wrong event: ", s)
 			return
 		}
-		initEv, err := filter.ParseInitialize(l)
+		rec, err := AddPoolInitFromLog(context.Background(), c.db, c.ChainID, filter, l)
 		if err != nil {
-			log.Error("parse log err: ", err)
+			if errors.Is(err, ErrZeroHookPool) {
+				return
+			}
+			log.Errorln("pool init add err:", err)
 			return
 		}
-		// skip zero hook pools
-		if initEv.Hooks == ZeroAddr {
-			return
-		}
-		poolid := Hash2Hex(initEv.Id)
-		poolK := binding.PoolKey{
-			Currency0:   initEv.Currency0,
-			Currency1:   initEv.Currency1,
-			Fee:         initEv.Fee,
-			TickSpacing: initEv.TickSpacing,
-			Hooks:       initEv.Hooks,
-		}
-		log.Infoln("add pool", poolid)
-		err = c.db.PoolAdd(context.Background(), dal.PoolAddParams{
-			Chid:    c.ChainID,
-			Poolid:  poolid,
-			Poolkey: poolK,
-		})
-		if err != nil {
-			log.Errorln("pooladd err:", err)
-		}
+		log.Infoln("add pool", rec.PoolID)
 	})
 }
