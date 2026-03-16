@@ -62,6 +62,7 @@ func (s *Server) RunScheduledOnce(ctx context.Context) {
 }
 
 func (s *Server) runOneRouter(ctx context.Context, row dal.Claimer) {
+	log.Info("run:", row)
 	onec, ok := chainMap[row.Chid]
 	if !ok {
 		log.Warnf("skip unsupported source chain %d for router %s", row.Chid, row.Router)
