@@ -97,7 +97,7 @@ func (d *DAL) GetPoolKeys(chid uint64, poolidmap binding.PoolIdMap) []binding.Po
 	for pid := range poolidmap {
 		pk, err := d.PoolGet(context.Background(), PoolGetParams{
 			Chid:   chid,
-			Poolid: "0x" + pid.Hex(),
+			Poolid: pid.Hex(),
 		})
 		if err != nil { // could be not in db
 			log.Errorln("PoolGet", pid, "err:", err)

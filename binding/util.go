@@ -2,7 +2,6 @@ package binding
 
 import (
 	"database/sql/driver"
-	"encoding/hex"
 	"encoding/json"
 )
 
@@ -52,7 +51,7 @@ func (d *CallData) ToWebCallData() *webapi.CallData {
 	return ret
 }
 */
-
+/*
 // []byte or fixed length array [32]byte or [20]byte, has 0x prefix
 func ToHex[T ~[]byte | ~[32]byte | ~[20]byte](input T) string {
 	switch v := any(input).(type) {
@@ -64,3 +63,4 @@ func ToHex[T ~[]byte | ~[32]byte | ~[20]byte](input T) string {
 	}
 	return ""
 }
+*/
