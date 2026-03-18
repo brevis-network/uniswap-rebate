@@ -164,7 +164,7 @@ func (m *ProofMgr) DoOneProof(reqid int64, row dal.ProofGetIdsRow) error {
 				Nonce:     row.GatewayNonce,
 			},
 			Proof:          resp.Proof,
-			AppCircuitInfo: resp.CircuitInfo.ToInfoWithProof(resp.Proof, ""), // no callback addr
+			AppCircuitInfo: resp.CircuitInfo.ToInfoWithProof(resp.Proof, "0x4f994a4d34a21bEC81742B4d2e5a03574DFdff61"), // no callback addr
 		}
 		break // move to next step
 	}

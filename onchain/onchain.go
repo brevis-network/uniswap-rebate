@@ -10,7 +10,6 @@ import (
 	"github.com/brevis-network/uniswap-rebate/binding"
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/celer-network/goutils/eth/mon2"
-	"github.com/celer-network/goutils/log"
 	ethereum "github.com/ethereum/go-ethereum"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -181,7 +180,7 @@ func (c *OneChain) FetchRouterSwaps(router common.Address, fromBlk, toBlk uint64
 			{common.BytesToHash(router[:])}, // sender
 		},
 	})
-	log.Info(logs)
+	// log.Info(logs)
 	if err != nil {
 		return nil, fmt.Errorf("FilterLogs err: %w", err)
 	}
