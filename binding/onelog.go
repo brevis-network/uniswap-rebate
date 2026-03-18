@@ -36,6 +36,9 @@ func NewCircuit(info *ProofInfo, swaps []OneLog, poolkeys []PoolKey) *circuit.Ga
 	for i, swap := range swaps {
 		ret.TxGasCap[i] = sdk.ConstUint32(swap.TxGasCap)
 	}
+	for i := len(swaps); i < circuit.MaxSwapNum; i++ {
+		ret.TxGasCap[i] = sdk.ConstUint32(0)
+	}
 	for i, poolkey := range poolkeys {
 		idx := i * 5
 		ret.PoolKey[idx] = sdk.ConstFromBigEndianBytes(poolkey.Currency0[:])
