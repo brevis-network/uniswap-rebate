@@ -3,6 +3,7 @@ package binding
 import (
 	"database/sql/driver"
 	"encoding/json"
+	"log"
 	"slices"
 
 	"github.com/brevis-network/brevis-sdk/sdk"
@@ -24,12 +25,14 @@ func (o OneLog) PoolId() common.Hash {
 
 // new app circuit from info and swaps
 func NewCircuit(info *ProofInfo, swaps []OneLog, poolkeys []PoolKey) *circuit.GasCircuit {
+	log.Println("NewCircuit:", info)
 	ret := &circuit.GasCircuit{
 		ChainId:    sdk.ConstUint64(info.ChainId),
 		PoolMgr:    sdk.ConstUint248(common.Hex2Bytes(info.PoolMgr)),
 		GasPerSwap: sdk.ConstUint32(info.GasPerSwap),
 		GasPerTx:   sdk.ConstUint32(info.GasPerTx),
 	}
+	log.Println("NewCircuit:", info, "Circuit:", ret)
 	for i, swap := range swaps {
 		ret.TxGasCap[i] = sdk.ConstUint32(swap.TxGasCap)
 	}
