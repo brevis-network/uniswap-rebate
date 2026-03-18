@@ -2,7 +2,6 @@ package circuit
 
 import (
 	"encoding/hex"
-	"log"
 	"math"
 
 	"github.com/brevis-network/brevis-sdk/sdk"
@@ -61,7 +60,6 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 
 	// sender topic of first swap log
 	router := api.ToUint248(in.Receipts.Raw[0].Fields[1].Value)
-	log.Println(c.PoolMgr, poolIDs, router)
 
 	// build datastream for all swaps
 	swaps := sdk.NewDataStream(api, in.Receipts)
@@ -83,7 +81,6 @@ func (c *GasCircuit) Define(api *sdk.CircuitAPI, in sdk.DataInput) error {
 				sdk.Uint32{Val: api.Bytes32.IsEqual(poolIDs[j], r.Fields[0].Value).Val},
 			)
 		}
-		log.Println(isSwap, eligible)
 
 		return api.Uint248.And(isSwap, api.ToUint248(eligible))
 	})
