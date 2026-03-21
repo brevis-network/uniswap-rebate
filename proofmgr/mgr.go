@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/brevis-network/brevis-sdk/sdk"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/commonproto"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/gwproto"
 	"github.com/brevis-network/brevis-sdk/sdk/proto/sdkproto"
@@ -14,27 +15,29 @@ import (
 	"github.com/celer-network/goutils/log"
 	"github.com/lthibault/jitterbug/v2"
 	"golang.org/x/sync/errgroup"
-	"google.golang.org/grpc"
 )
 
 const (
-	BrvGwApiKey = "UniGas" // UniGasAgg
+	BrvGwApiKey = "123456" // UniGasAgg
 )
 
 type ProofMgr struct {
-	gwclient   gwproto.GatewayClient
+	gwclient   *sdk.GatewayClient
 	db         *dal.DAL
 	dstChId    uint64 // 130 Unichain mainnet
 	appProvers []string
 }
 
 func NewProofMgr(gwrpc string, appProvers []string, dstChId uint64, db *dal.DAL) *ProofMgr {
-	conn, _ := grpc.NewClient(gwrpc)
+	gwc, err := sdk.NewGatewayClient(gwrpc)
+	if err != nil {
+		log.Fatal("new gw client err:", err)
+	}
 	return &ProofMgr{
 		appProvers: appProvers,
 		dstChId:    dstChId,
 		db:         db,
-		gwclient:   gwproto.NewGatewayClient(conn),
+		gwclient:   gwc,
 	}
 }
 
@@ -63,7 +66,7 @@ func (m *ProofMgr) Run(info *binding.ProofInfo) {
 		ApiKey:        BrvGwApiKey,
 	}
 	gwreq.Queries = buildGwQueries(sdkreqs, appInfos)
-	asyncResp, err := m.gwclient.SendBatchQueriesAsync(context.Background(), gwreq)
+	asyncResp, err := m.gwclient.SendBatchQueriesAsync(gwreq)
 	if err != nil {
 		log.Errorln(info.ReqId, "SendBatchQueriesAsync err:", err)
 		return
@@ -170,7 +173,7 @@ func (m *ProofMgr) DoOneProof(reqid int64, row dal.ProofGetIdsRow) error {
 	}
 	// now try sending to gw. Note if gw side isn't ready, we keep retry
 	for range t.C {
-		resp, _ := m.gwclient.SubmitAppCircuitProof(context.Background(), gwReq)
+		resp, _ := m.gwclient.SubmitProof(gwReq)
 		if resp.Err != nil {
 			log.Errorln("submitAppProof err:", resp.Err)
 		}
@@ -180,7 +183,7 @@ func (m *ProofMgr) DoOneProof(reqid int64, row dal.ProofGetIdsRow) error {
 	}
 	// now polling gw for final proof
 	for range t.C {
-		resp, _ := m.gwclient.GetQueryStatus(context.Background(), &gwproto.GetQueryStatusRequest{
+		resp, _ := m.gwclient.GetQueryStatus(&gwproto.GetQueryStatusRequest{
 			TargetChainId: m.dstChId,
 			QueryKey: &gwproto.QueryKey{
 				QueryHash: row.GatewayRequestID,

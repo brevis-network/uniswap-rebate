@@ -1,0 +1,24 @@
+circuit_name = "unigas" # Fill in
+grpc_port = 9001
+rest_port = 9002
+
+[service]
+prover_id = "" # Use hostname
+setup_dir = "$HOME/circuitOut" # To be appended with "/{circuit_name}"
+srs_dir = "$HOME/kzgsrs"
+gateway_url = "35.84.252.221:11080"
+direct_load = true
+proof_persistence_type = "file"
+proof_persistence_options = "" # Fill in
+data_persistence_type = "file"
+data_persistence_options = "" # Use default
+concurrent_fetch_limit = 20
+concurrent_prove_limit = 1
+
+[[source_chain]]
+chain_id = 11155111
+rpc_url = "https://sepolia.infura.io/v3/e9b3b5951e8b47fbb77805b539be7958"
+
+[[source_chain]]
+chain_id = 1
+rpc_url = "https://mainnet.infura.io/v3/e9b3b5951e8b47fbb77805b539be7958"

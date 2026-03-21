@@ -45,7 +45,7 @@ var (
 )
 
 const (
-	BrvApiKey = "" // api key talk to brevis gateway
+	BrvApiKey = "123456" // api key talk to brevis gateway
 )
 
 // proveCmd represents the prove command

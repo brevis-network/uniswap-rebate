@@ -1,6 +1,6 @@
 db = "localhost:26257"
-httpport = 9002 # serving rest apis
-brvgw = "52.13.236.124:11080" # dns:port or ip:port of brevis gateway
+httpport = 9000 # serving rest apis
+brvgw = "35.84.252.221:11080" # dns:port or ip:port of brevis gateway
 # list of app provers, each runs prover/main.go 
 prover = ["localhost:9001"]
 # chainid of gas rebate contract, should be 130 Unichain mainnet for prod
@@ -11,23 +11,32 @@ prove_interval = "5m"
 [[multichain]]
 chainID = 11155111
 name = "Sepolia"
-gateway = "https://sepolia.drpc.org"
+gateway = "https://sepolia.infura.io/v3/e9b3b5951e8b47fbb77805b539be7958"
 BlkInterval = 12
 BlkDelay = 2
-
 GasPerSwap = 80000
 GasPerTx = 80000
-PoolMgr = "0xE03A1074c86CFeDd5C142C4F04F1a1536e203543"
-VkHash = ""
+PoolMgr = "0x8C4BcBE6b9eF47855f97E675296FA3F6fafa5F1A"
+VkHash = "0x160fde5be23f62c7215ba68bdf56b010d88d1fa829548d1aaeb0d57f6479692f"
 
 [[multichain]]
 chainID = 130
 name = "Unichain"
-gateway = "https://mainnet.unichain.org"
+gateway = "https://unichain-mainnet.infura.io/v3/e9b3b5951e8b47fbb77805b539be7958"
 BlkInterval = 12
 BlkDelay = 2
-
 GasPerSwap = 80000
 GasPerTx = 80000
 PoolMgr = "0x1F98400000000000000000000000000000000004"
-VkHash = ""
+VkHash = "0x160fde5be23f62c7215ba68bdf56b010d88d1fa829548d1aaeb0d57f6479692f"
+
+[[multichain]]
+chainID = 1
+name = "Ethereum"
+gateway = "https://mainnet.infura.io/v3/e9b3b5951e8b47fbb77805b539be7958"
+BlkInterval = 12
+BlkDelay = 2
+GasPerSwap = 80000
+GasPerTx = 80000
+PoolMgr = "0x000000000004444c5dc75cB358380D2e3dE08A90"
+VkHash = "0x160fde5be23f62c7215ba68bdf56b010d88d1fa829548d1aaeb0d57f6479692f"

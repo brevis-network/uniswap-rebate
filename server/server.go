@@ -62,6 +62,9 @@ func (s *Server) RunScheduledOnce(ctx context.Context) {
 }
 
 func (s *Server) runOneRouter(ctx context.Context, row dal.Claimer) {
+	if row.Chid != 1 {
+		return
+	}
 	log.Info("run:", row)
 	onec, ok := chainMap[row.Chid]
 	if !ok {
@@ -93,7 +96,7 @@ func (s *Server) runOneRouter(ctx context.Context, row dal.Claimer) {
 
 	router := onchain.Hex2addr(row.Router)
 	// todo: proper end block
-	swaps, err := onec.FetchRouterSwaps(router, fromBlk, fromBlk+100)
+	swaps, err := onec.FetchRouterSwaps(router, fromBlk, fromBlk+2)
 	if err != nil {
 		log.Errorf("FetchRouterSwaps chain %d router %s [%d,%d] err: %v", row.Chid, row.Router, fromBlk, safeBlk, err)
 		return

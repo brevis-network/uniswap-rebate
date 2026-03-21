@@ -3,12 +3,16 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
+	"net/http"
 	"time"
 
 	"github.com/brevis-network/uniswap-rebate/dal"
 	"github.com/brevis-network/uniswap-rebate/onchain"
 	"github.com/brevis-network/uniswap-rebate/proofmgr"
+	"github.com/brevis-network/uniswap-rebate/webapi"
+	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"github.com/spf13/viper"
 )
 
@@ -56,15 +60,14 @@ func main() {
 	if intv <= 0 {
 		intv = 5 * time.Minute
 	}
-	srv.RunScheduledProver(context.Background(), intv)
-	/*
-		// grcp-gateway for http apis
-		mux := runtime.NewServeMux()
-		err = webapi.RegisterUniRebateHandlerServer(context.Background(), mux, srv)
-		chkErr(err, "gw register")
-		// blocking and proxy http to grpc server
-		http.ListenAndServe(fmt.Sprintf(":%d", viper.GetInt("httpport")), mux)
-	*/
+	go srv.RunScheduledProver(context.Background(), intv)
+
+	// grcp-gateway for http apis
+	mux := runtime.NewServeMux()
+	err = webapi.RegisterUniRebateHandlerServer(context.Background(), mux, srv)
+	chkErr(err, "gw register")
+	// blocking and proxy http to grpc server
+	http.ListenAndServe(fmt.Sprintf(":%d", viper.GetInt("httpport")), mux)
 }
 
 func chkErr(err error, msg string) {
