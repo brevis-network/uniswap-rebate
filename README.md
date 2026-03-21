@@ -1,4 +1,7 @@
 # uniswap-rebate
+2026-03-20 note: latest working system per 2026 spec. GasRebate at [0x4f994a4d34a21bEC81742B4d2e5a03574DFdff61](https://uniscan.xyz/address/0x4f994a4d34a21bEC81742B4d2e5a03574DFdff61#readContract)
+
+
 This is NOT a uniswap v4 hook, but to give fee rebate to pools w/ non-zero hooks address.
 
 See https://github.com/uniswapfoundation/router-rebates/ for more details. Onchain claim code is integrated into Uniswap's contract.
